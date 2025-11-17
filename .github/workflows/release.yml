@@ -77,16 +77,26 @@ jobs:
       - name: Sign binary (Linux, optional GPG)
         if: matrix.os == 'ubuntu-latest'
         env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }} # 📝 کلید خصوصی GPG را base64 کنید
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           if [ -z "$GPG_PRIVATE_KEY" ]; then
             echo "GPG_PRIVATE_KEY not set, skipping signing"
             exit 0
           fi
-          echo "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import
-          gpg --batch --yes --passphrase "$GPG_PASSPHRASE" --output target/release/${{ matrix.binary_name }}.sig --detach-sign target/release/${{ matrix.binary_name }}
 
+          # import key
+          echo "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import
+
+          # allow loopback pinentry (required for GitHub Actions)
+          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+
+          # sign
+          gpg --batch --yes \
+            --pinentry-mode loopback \
+            --passphrase "$GPG_PASSPHRASE" \
+            --output target/release/${{ matrix.binary_name }}.sig \
+            --detach-sign target/release/${{ matrix.binary_name }}
       - name: Package artifacts
         shell: bash
         run: |
