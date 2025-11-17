@@ -1,0 +1,124 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build-and-sign (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: linux
+            binary_name: qbit-cli
+          - os: macos-latest
+            artifact: macos
+            binary_name: qbit-cli
+          - os: windows-latest
+            artifact: windows
+            binary_name: qbit-cli.exe
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build release binary
+        run: cargo build --release
+
+      - name: Sign binary (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        env:
+          WINDOWS_CERT_PFX: ${{ secrets.WINDOWS_CERT_PFX }} # 📝 اینجا یک cert باینری به صورت base64 قرار دهید.
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          if (-not $env:WINDOWS_CERT_PFX) { Write-Host "WINDOWS_CERT_PFX not set, skipping signing"; return }
+          $pfxPath = Join-Path $env:RUNNER_TEMP "codesign.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:WINDOWS_CERT_PFX))
+          & "$env:ProgramFiles\Windows Kits\10\bin\x64\signtool.exe" sign `
+            /f $pfxPath `
+            /p $env:WINDOWS_CERT_PASSWORD `
+            /tr http://timestamp.sectigo.com `
+            /td sha256 `
+            /fd sha256 `
+            target\release\${{ matrix.binary_name }}
+
+      - name: Sign binary (macOS)
+        if: matrix.os == 'macos-latest'
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }} # 📝 یک فایل p12 base64 شده اینجا قرار بدهید.
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          MACOS_IDENTITY: ${{ secrets.MACOS_IDENTITY }} # مثلا: "Developer ID Application: Your Name (TEAMID)"
+        run: |
+          if [ -z "$MACOS_CERT_P12" ]; then
+            echo "MACOS_CERT_P12 not set, skipping signing"
+            exit 0
+          fi
+          CERT_PATH="$RUNNER_TEMP/cert.p12"
+          echo "$MACOS_CERT_P12" | base64 --decode > "$CERT_PATH"
+          security create-keychain -p "" build.keychain
+          security import "$CERT_PATH" -k build.keychain -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
+          security unlock-keychain -p "" build.keychain
+          /usr/bin/codesign --force --sign "$MACOS_IDENTITY" "target/release/${{ matrix.binary_name }}"
+
+      - name: Sign binary (Linux, optional GPG)
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }} # 📝 کلید خصوصی GPG را base64 کنید
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          if [ -z "$GPG_PRIVATE_KEY" ]; then
+            echo "GPG_PRIVATE_KEY not set, skipping signing"
+            exit 0
+          fi
+          echo "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import
+          gpg --batch --yes --passphrase "$GPG_PASSPHRASE" --output target/release/${{ matrix.binary_name }}.sig --detach-sign target/release/${{ matrix.binary_name }}
+
+      - name: Package artifacts
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp target/release/${{ matrix.binary_name }} dist/
+          cp scripts/install/* dist/ 2>/dev/null || true
+          cp assets/icon.svg dist/
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            powershell Compress-Archive -Path dist\* -DestinationPath qbit-${{ matrix.artifact }}.zip
+          else
+            tar -czf qbit-${{ matrix.artifact }}.tar.gz -C dist .
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: qbit-${{ matrix.artifact }}
+          path: |
+            qbit-${{ matrix.artifact }}.zip
+            qbit-${{ matrix.artifact }}.tar.gz
+
+  release:
+    name: publish
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Publish GitHub release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
