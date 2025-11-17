@@ -108,9 +108,9 @@ jobs:
           cp scripts/install/* dist/ 2>/dev/null || true
           cp assets/icon.svg dist/
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            powershell Compress-Archive -Path dist\* -DestinationPath qbit-${{ matrix.artifact }}.zip
+            powershell Compress-Archive -Path dist\* -DestinationPath qbit-${{ matrix.artifact }}-setup.zip
           else
-            tar -czf qbit-${{ matrix.artifact }}.tar.gz -C dist .
+            tar -czf qbit-${{ matrix.artifact }}-setup.tar.gz -C dist .
           fi
 
       - name: Upload artifact
@@ -118,8 +118,8 @@ jobs:
         with:
           name: qbit-${{ matrix.artifact }}
           path: |
-            qbit-${{ matrix.artifact }}.zip
-            qbit-${{ matrix.artifact }}.tar.gz
+            qbit-${{ matrix.artifact }}-setup.zip
+            qbit-${{ matrix.artifact }}-setup.tar.gz
 
   release:
     name: publish

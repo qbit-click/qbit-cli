@@ -1,93 +1,114 @@
-# Qbit CLI
+# Qbit CLI – Unified Dev Environment & Package Automation
 
-Qbit یک ابزار CLI کراس پلتفرم است که برای تکمیل جریان کاری ابزار‌های موجود طراحی شده است. این ابزار عملیات متداول توسعه را با یک رابط یکتا ساده می‌کند و به شما اجازه می‌دهد وابستگی‌ها و محیط پروژه را از طریق همان فرمان مدیریت کنید.
+Qbit is a cross-platform developer command line that turns repetitive environment setup into a single command. Install system tools, bootstrap Python/JavaScript/Dart projects, and run your own scripts from one `qbit` binary that works on Windows, macOS, and Linux.
 
-## ویژگی‌ها
+## Why Qbit?
 
-- نصب نرم‌افزارهای سیستمی از طریق فرمان‌های ساده مانند:
-  ```
+- **Install anything with one command**
+  ```bash
   qbit install java
   qbit install chrome:127.0.0.0
   ```
-  این فرمان‌ها بسته را با استفاده از مدیر بستهٔ پیش‌فرض سیستم‌عامل نصب می‌کنند (در ویندوز `winget`, در توزیع‌های دبیان/اوبونتو `apt`, و در macOS `brew`). می‌توانید نسخهٔ دقیق را هم با ساختار `نام:نسخه` مشخص کنید.
+  Qbit detects the native package manager (`winget`, `brew`, `apt`, `choco`, or `scoop`), maps the logical name to the correct package ID, and installs the exact version you request.
 
-- آماده‌سازی سریع محیط پروژه‌های زبان‌های مختلف. برای مثال:
-  ```
+- **Project bootstrapping**
+  ```bash
   qbit py init
+  qbit js init
+  qbit dart init
   ```
-  فولدر فعلی را برای یک پروژه پایتون آماده می‌کند و ساختار و فایل‌های اولیه را می‌سازد.
+  Scaffold virtual environments, `requirements.txt`, `package.json`, entry files, and other boilerplate instantly.
 
-- مدیریت وابستگی هر زبان با رابط یکپارچه. نمونه‌هایی از استفاده:
-  ```
+- **Language-aware dependency management**
+  ```bash
   qbit py add pandas
   qbit js add react
   ```
-  فرمان `add` بسته را در محیط استاندارد همان زبان نصب می‌کند؛ برای پایتون علاوه بر نصب پکیج، آن را به فایل `requirements.txt` اضافه می‌کند تا وابستگی‌ها نسخه‌بندی شده ثبت شوند.
-- اجرای اسکریپت‌های پروژه از طریق `qbit run <name>` که اسکریپت‌ها را از فایل `qbit.yml` (یا `qbit.toml`) خوانده و به صورت ترتیبی اجرا می‌کند. برای مثال:
-  ```
+  Python packages are installed inside the managed venv, frozen back into `requirements.txt`, and JavaScript packages are added through whichever manager (npm/pnpm/yarn/bun/bun) is detected.
+
+- **Script automation with `qbit run`**
+  Define workflows inside `qbit.yml`/`qbit.toml` and execute them anywhere:
+  ```bash
   qbit run dev
-  ```
-  اسکریپت `dev` را طبق تعریف شما اجرا می‌کند. همچنین می‌توانید برای هر زبان اسکریپت اختصاصی داشته باشید، مانند:
-  ```
   qbit js run start
   ```
-  که اسکریپت‌های `package.json` را با استفاده از npm/pnpm/yarn/bun اجرا می‌کند.
+  Front-end builds, backend migrations, or multi-step CI recipes all become reusable commands.
 
-## جریان کاری پایتون
+## Power of `qbit.yml`
 
-- `qbit py init`: یک محیط مجازی اختصاصی (مثلاً `.venv`) می‌سازد، فایل `requirements.txt` را ایجاد یا بروزرسانی می‌کند و ساختار پوشه‌ای اولیه (مانند `src/` یا `app.py`) را آماده می‌کند تا بتوانید فوراً کدنویسی را آغاز کنید.
-- `qbit py add <package>`: پکیج را در محیط مجازی فعال نصب می‌کند و در صورت وجود نسخه مشخص‌شده، همان نسخه را نصب می‌کند. سپس نام و نسخه نصب‌شده را به `requirements.txt` اضافه می‌کند تا در تیم‌های مختلف یا محیط CI قابل بازتولید باشد.
-- `qbit py add --dev <package>` (در صورت نیاز): پکیج را به بخش وابستگی‌های توسعه منتقل می‌کند؛ این فایل جداگانه‌ای مانند `requirements-dev.txt` ایجاد می‌کند تا محیط تولید و توسعه از هم تفکیک شوند.
-- خروجی تمام فرمان‌ها وضعیت عملیات را به صورت قابل خواندن نمایش می‌دهد تا بتوانید سریعاً خطاهای نصب یا کانفیگ را پیدا کنید.
+Qbit looks at `qbit.yml` (or `qbit.toml`) in your project root. Running `qbit js init` generates a starter file like this:
 
-## فایل پیکربندی `qbit.yml`
+```yaml
+scripts:
+  dev: "npm run dev"
+  build-all:
+    - "qbit js run build"
+    - "cargo build --release"
 
-- در روت پروژه یک فایل YAML/TOML با نام `qbit.yml` یا `qbit.toml` قرار دهید و اسکریپت‌ها/وابستگی‌های سفارشی خود را در آن تعریف کنید. اگر از فرمان `qbit js init` استفاده کنید، یک فایل نمونه `qbit.yml` به صورت خودکار ساخته می‌شود تا نقطه شروع داشته باشید. نمونه‌ای از ساختار:
-  ```yaml
-  scripts:
-    dev: "npm run dev"
-    build-all:
-      - "qbit js run build"
-      - "cargo build --release"
+install:
+  postgres:
+    version: "15"
+    identifiers:
+      apt: "postgresql"
+      winget: "PostgreSQL.PostgreSQL"
+      default: "postgresql"
+  redis:
+    version: "7.2"
+    identifiers:
+      apt: "redis-server"
+      winget: "Redis.Redis-CLI"
+```
 
-  install:
-    postgres:
-      version: "15"
-      identifiers:
-        apt: "postgresql"
-        winget: "PostgreSQL.PostgreSQL"
-        default: "postgresql"
-    redis:
-      version: "7.2"
-      identifiers:
-        apt: "redis-server"
-        winget: "Redis.Redis-CLI"
-  ```
-- با فرمان `qbit run <script>` اسکریپت‌های تعریف‌شده اجرا می‌شوند و با `qbit install <target>` اگر نام هدف در بخش `install` وجود داشته باشد، نسخهٔ مشخص‌شده نصب می‌شود (برای مثال `postgres` با شناسه‌های اختصاصی در apt/winget). همچنین می‌توانید به صورت مستقیم نسخه را در خط فرمان مشخص کنید (`qbit install chrome:127.0.0.0`). در غیر این صورت از برنامه‌ی نصب داخلی استفاده می‌شود.
+- `qbit run build-all` executes the commands sequentially.
+- `qbit install postgres` installs version 15 and automatically chooses the correct package ID for each platform.
+- Inline overrides are supported: `qbit install chrome:127.0.0.0`.
 
-## نصب سیستم‌ها
+## Installers & PATH integration
 
-- qbit به صورت خودکار مدیر بستهٔ مناسب را تشخیص می‌دهد:
-  - ویندوز: `winget install ... --accept-*`
-  - macOS: `brew install`
-  - دبیان/اوبونتو: `sudo apt-get install`
-  - سایر پلتفرم‌های ویندوزی/لینوکسی را می‌توانید با متغیر `QBIT_PACKAGE_MANAGER` به `winget/apt/brew/choco/scoop` مجبور کنید.
-- نسخهٔ موردنظر یا از `qbit.yml` (بخش `install`) خوانده می‌شود یا مستقیماً از `نام:نسخه` در خط فرمان استخراج می‌گردد و در دستور نصب مصرف می‌شود. برای مثال در Debian دستور کامل `sudo apt-get install google-chrome-stable=127.0.0.0` اجرا خواهد شد.
+Every release ships with platform-specific setup archives:
 
-## شروع به کار
+| Platform | Asset | Inside the archive |
+|----------|-------|--------------------|
+| Windows  | `qbit-windows-setup.zip` | `qbit-cli.exe`, `install.ps1` (adds to `Program Files\Qbit` and updates PATH), icon |
+| macOS    | `qbit-macos-setup.tar.gz` | `qbit-cli`, `install_macos.sh` (drops a `.app` bundle + symlink), icon |
+| Linux    | `qbit-linux-setup.tar.gz` | `qbit-cli`, `install.sh` (copies to `/opt/qbit` + `/usr/local/bin/qbit` symlink), optional GPG signature |
 
-1. مخزن را کلون کنید و باینری CLI را بسازید:
-   ```
-   cargo build --release
-   ```
-2. باینری ساخته شده در `target/release/qbit` آماده اجرا است؛ می‌توانید آن را در مسیر دلخواه خود قرار دهید.
-3. دستور `qbit --help` را اجرا کنید تا لیست کامل فرمان‌ها و زیر فرمان‌ها را مشاهده کنید.
+Usage example on Linux/macOS:
+```bash
+tar -xzf qbit-linux-setup.tar.gz
+sudo ./install.sh
+qbit --help
+```
+On Windows, extract the archive, right-click `install.ps1` → *Run with PowerShell* (or execute from an elevated terminal). The script copies the binary and appends the destination to the system PATH, so the `qbit` command is available globally.
 
-## مشارکت
+## Supported Commands
 
-- گزارش باگ و درخواست ویژگی را در بخش Issues ثبت کنید.
-- برای مشارکت، پیش از ارسال Pull Request حتماً تست‌ها را اجرا کنید و توضیح مختصری از تغییرات ارائه دهید.
+- `qbit install <name[:version]>` – Install operating-system dependencies via native package managers.
+- `qbit run <script>` – Execute custom workflows defined in configuration.
+- `qbit py <init|add|remove>` – Python virtualenv management with automatic `requirements.txt` updates.
+- `qbit js <init|add|remove|run>` – JavaScript project scaffolding, npm/yarn/pnpm/bun integration, and script execution.
+- `qbit dart ...` – Dart scaffolding (extensible for Flutter or server projects).
 
-## مجوز
+Use `qbit --help` or `qbit <command> --help` for details.
 
-این پروژه تحت مجوز مندرج در فایل `LICENSE` منتشر شده است.
+## Build from Source
+
+```bash
+git clone https://github.com/<your-org>/qbit-cli.git
+cd qbit-cli
+cargo build --release
+./target/release/qbit --help
+```
+
+Rust 1.76+ is recommended. The repository also includes `cargo dev` for sandbox testing inside `dev-sandbox/`.
+
+## Contributing
+
+Issues and pull requests are welcome. Before submitting a PR:
+1. Run `cargo fmt && cargo clippy && cargo test`.
+2. Test key workflows (`qbit py init`, `qbit install ...`, `qbit run ...`) in the dev sandbox.
+3. Describe the motivation and behavior changes clearly.
+
+## License
+
+Distributed under the terms of the MIT License. See [LICENSE](LICENSE) for details.
