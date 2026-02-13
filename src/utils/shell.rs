@@ -49,3 +49,39 @@ fn shell_command(command: &str) -> Command {
     cmd.arg(command);
     cmd
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shell_command_uses_platform_shell() {
+        let cmd = shell_command("echo hi");
+        let program = cmd.get_program().to_string_lossy().to_string();
+        let args: Vec<String> = cmd
+            .get_args()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect();
+
+        #[cfg(windows)]
+        {
+            let lower = program.to_ascii_lowercase();
+            assert!(lower == "cmd" || lower.ends_with("cmd.exe"));
+            assert!(args.iter().any(|arg| arg.eq_ignore_ascii_case("/C")));
+            assert!(args.iter().any(|arg| arg == "echo hi"));
+        }
+
+        #[cfg(not(windows))]
+        {
+            assert_eq!(program, "sh");
+            assert!(args.iter().any(|arg| arg == "-c"));
+            assert!(args.iter().any(|arg| arg == "echo hi"));
+        }
+    }
+
+    #[test]
+    fn run_commands_rejects_empty_command_list() {
+        let err = run_commands("demo", &[]).expect_err("must fail");
+        assert!(err.to_string().contains("no commands defined"));
+    }
+}

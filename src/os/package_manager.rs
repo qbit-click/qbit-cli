@@ -82,7 +82,7 @@ pub fn detect_package_manager() -> Result<Box<dyn PackageManager>> {
     )
 }
 
-fn package_manager_from_name(name: &str) -> Option<Box<dyn PackageManager>> {
+pub(crate) fn package_manager_from_name(name: &str) -> Option<Box<dyn PackageManager>> {
     match name.trim().to_ascii_lowercase().as_str() {
         "apt" | "apt-get" => Some(Box::new(AptGet)),
         "dnf" => Some(Box::new(Dnf)),

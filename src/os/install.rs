@@ -3,50 +3,37 @@ use std::process::{Command, Stdio};
 use anyhow::{Context, Result, bail};
 
 use crate::config::{InstallSpec, load_project_config};
+#[cfg(test)]
+use crate::os::package_manager::package_manager_from_name;
 use crate::os::package_manager::{InstallCommand, PackageManager, detect_package_manager};
+
+#[derive(Debug, Clone)]
+struct InstallPlan {
+    manager_name: String,
+    identifier: String,
+    requested_version: Option<String>,
+    inline_overrode_config: bool,
+    command: InstallCommand,
+}
 
 /// Entry point from CLI.
 pub fn install_target(raw_spec: &str, dry_run: bool, yes: bool) -> Result<()> {
-    let (logical_target, inline_version) = parse_target_spec(raw_spec)?;
     let selected_manager = detect_package_manager()?;
+    let plan = build_install_plan(raw_spec, selected_manager.as_ref(), yes)?;
 
-    let mut configured_version: Option<String> = None;
-    let mut identifier = logical_target.clone();
-
-    if let Some(cfg) = load_project_config()? {
-        if let Some((entry_name, spec)) = cfg.install_target_case_insensitive(&logical_target) {
-            configured_version = spec.configured_version().map(|version| version.to_string());
-            identifier = resolve_identifier(spec, selected_manager.as_ref(), &logical_target);
-            println!(
-                "Using install config `{}` from {}",
-                entry_name,
-                cfg.path.display()
-            );
-        }
-    }
-
-    let inline_was_provided = inline_version.is_some();
-    let requested_version = inline_version.or(configured_version.clone());
-
-    if inline_was_provided && configured_version.is_some() {
+    if plan.inline_overrode_config {
         println!("Inline version override applied.");
     }
 
-    println!("Selected package manager: {}", selected_manager.name());
-    println!("Resolved identifier: {identifier}");
-    if let Some(version) = requested_version.as_deref() {
+    println!("Selected package manager: {}", plan.manager_name);
+    println!("Resolved identifier: {}", plan.identifier);
+    if let Some(version) = plan.requested_version.as_deref() {
         println!("Resolved version: {version}");
     } else {
         println!("Resolved version: latest available from package manager");
     }
 
-    let mut install_cmd =
-        selected_manager.build_install_cmd(&identifier, requested_version.as_deref())?;
-    if yes {
-        selected_manager.apply_yes_flag(&mut install_cmd);
-    }
-
-    execute_or_print_dry_run(&install_cmd, dry_run, execute_install)
+    execute_or_print_dry_run(&plan.command, dry_run, execute_install)
 }
 
 fn parse_target_spec(spec: &str) -> Result<(String, Option<String>)> {
@@ -97,6 +84,45 @@ fn resolve_identifier(
     logical_target.to_string()
 }
 
+fn build_install_plan(
+    raw_spec: &str,
+    manager: &dyn PackageManager,
+    yes: bool,
+) -> Result<InstallPlan> {
+    let (logical_target, inline_version) = parse_target_spec(raw_spec)?;
+
+    let mut configured_version: Option<String> = None;
+    let mut identifier = logical_target.clone();
+
+    if let Some(cfg) = load_project_config()? {
+        if let Some((entry_name, spec)) = cfg.install_target_case_insensitive(&logical_target) {
+            configured_version = spec.version().map(|version| version.to_string());
+            identifier = resolve_identifier(spec, manager, &logical_target);
+            println!(
+                "Using install config `{}` from {}",
+                entry_name,
+                cfg.path.display()
+            );
+        }
+    }
+
+    let inline_overrode_config = inline_version.is_some() && configured_version.is_some();
+    let requested_version = inline_version.or(configured_version.clone());
+
+    let mut command = manager.build_install_cmd(&identifier, requested_version.as_deref())?;
+    if yes {
+        manager.apply_yes_flag(&mut command);
+    }
+
+    Ok(InstallPlan {
+        manager_name: manager.name().to_string(),
+        identifier,
+        requested_version,
+        inline_overrode_config,
+        command,
+    })
+}
+
 fn execute_install(command: &InstallCommand) -> Result<()> {
     let status = Command::new(&command.program)
         .args(&command.args)
@@ -132,7 +158,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Result;
+    use std::ffi::OsString;
+
+    use proptest::prelude::*;
+    use serial_test::serial;
 
     use super::*;
     use crate::config::InstallSpec;
@@ -164,11 +193,63 @@ mod tests {
         }
     }
 
+    struct EnvGuard {
+        key: &'static str,
+        original: Option<OsString>,
+    }
+
+    impl EnvGuard {
+        fn set(key: &'static str, value: &str) -> Self {
+            let original = std::env::var_os(key);
+            // SAFETY: tests using this helper are marked `serial`, so there is no
+            // concurrent environment mutation within this process.
+            unsafe { std::env::set_var(key, value) };
+            Self { key, original }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            match &self.original {
+                Some(value) => {
+                    // SAFETY: see `EnvGuard::set`; restoration happens in the same serial test.
+                    unsafe { std::env::set_var(self.key, value) };
+                }
+                None => {
+                    // SAFETY: see `EnvGuard::set`; restoration happens in the same serial test.
+                    unsafe { std::env::remove_var(self.key) };
+                }
+            }
+        }
+    }
+
+    fn plan_from_env_override(raw_spec: &str, yes: bool) -> Result<InstallPlan> {
+        let raw = std::env::var("QBIT_PACKAGE_MANAGER")
+            .expect("QBIT_PACKAGE_MANAGER must be set for this test");
+        let manager = package_manager_from_name(&raw)
+            .ok_or_else(|| anyhow::anyhow!("unknown package manager in test: {raw}"))?;
+        build_install_plan(raw_spec, manager.as_ref(), yes)
+    }
+
     #[test]
     fn parse_target_with_inline_version() {
         let parsed = parse_target_spec("python:3.12").expect("must parse");
         assert_eq!(parsed.0, "python");
         assert_eq!(parsed.1.as_deref(), Some("3.12"));
+    }
+
+    #[test]
+    fn parse_target_with_trimmed_values() {
+        let parsed = parse_target_spec("  chrome:127.0.0.0   ").expect("must parse");
+        assert_eq!(parsed.0, "chrome");
+        assert_eq!(parsed.1.as_deref(), Some("127.0.0.0"));
+    }
+
+    #[test]
+    fn parse_target_without_version_is_trimmed() {
+        let parsed = parse_target_spec("  python  ").expect("must parse");
+        assert_eq!(parsed.0, "python");
+        assert_eq!(parsed.1, None);
     }
 
     #[test]
@@ -220,5 +301,94 @@ mod tests {
         );
         let result = execute_or_print_dry_run(&command, false, |_| Ok(()));
         assert!(result.is_ok());
+    }
+
+    #[test]
+    #[serial]
+    fn build_plan_uses_winget_from_env_override() {
+        let _guard = EnvGuard::set("QBIT_PACKAGE_MANAGER", "winget");
+        let plan = plan_from_env_override("Python.Python.3.12:3.12", true).expect("plan");
+
+        assert_eq!(plan.manager_name, "winget");
+        assert_eq!(plan.command.program, "winget");
+        assert_eq!(
+            plan.command.args.first().map(String::as_str),
+            Some("install")
+        );
+        assert!(
+            plan.command
+                .args
+                .iter()
+                .any(|arg| arg == "--accept-source-agreements")
+        );
+        assert!(
+            plan.command
+                .args
+                .iter()
+                .any(|arg| arg == "--accept-package-agreements")
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn build_plan_uses_apt_from_env_override_with_version() {
+        let _guard = EnvGuard::set("QBIT_PACKAGE_MANAGER", "apt");
+        let plan = plan_from_env_override("python:3.12", false).expect("plan");
+
+        if plan.command.program == "sudo" {
+            assert_eq!(
+                plan.command.args.first().map(String::as_str),
+                Some("apt-get")
+            );
+            assert_eq!(
+                plan.command.args.get(1).map(String::as_str),
+                Some("install")
+            );
+        } else {
+            assert_eq!(plan.command.program, "apt-get");
+            assert_eq!(
+                plan.command.args.first().map(String::as_str),
+                Some("install")
+            );
+        }
+
+        assert!(plan.command.render().contains("python=3.12"));
+    }
+
+    #[test]
+    #[ignore = "Documenting intended behavior: install identifiers must preserve exact casing."]
+    fn identifiers_preserve_casing_in_plan() {
+        let spec = InstallSpec::Detailed {
+            version: None,
+            identifiers: [("winget".to_string(), "Python.Python.3.12".to_string())]
+                .into_iter()
+                .collect(),
+        };
+
+        let resolved = resolve_identifier(&spec, &DummyPm, "python");
+        assert_eq!(resolved, "Python.Python.3.12");
+    }
+
+    proptest! {
+        #[test]
+        fn parse_target_spec_property_never_panics(
+            name in "[^:\\r\\n]{0,24}",
+            version in "[^\\r\\n]{0,24}",
+            use_version in any::<bool>(),
+            left_ws in "[ \\t]{0,4}",
+            right_ws in "[ \\t]{0,4}",
+        ) {
+            let spec = if use_version {
+                format!("{left_ws}{name}:{version}{right_ws}")
+            } else {
+                format!("{left_ws}{name}{right_ws}")
+            };
+
+            let result = parse_target_spec(&spec);
+            if let Ok((resolved_name, _)) = result {
+                prop_assert_eq!(resolved_name.trim(), resolved_name);
+                prop_assert!(!resolved_name.is_empty());
+            }
+        }
     }
 }

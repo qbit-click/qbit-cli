@@ -369,7 +369,129 @@ impl JsPackageManager {
 
 #[cfg(test)]
 mod tests {
+    use std::ffi::OsString;
+    use std::fs;
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
+    use std::path::{Path, PathBuf};
+
+    use serial_test::serial;
+    use tempfile::tempdir;
+
     use super::*;
+
+    struct EnvGuard {
+        key: &'static str,
+        original: Option<OsString>,
+    }
+
+    impl EnvGuard {
+        fn set(key: &'static str, value: impl AsRef<std::ffi::OsStr>) -> Self {
+            let original = std::env::var_os(key);
+            // SAFETY: tests that mutate env vars use `#[serial]`, so there is no
+            // concurrent mutation in this process.
+            unsafe { std::env::set_var(key, value) };
+            Self { key, original }
+        }
+
+        fn remove(key: &'static str) -> Self {
+            let original = std::env::var_os(key);
+            // SAFETY: tests that mutate env vars use `#[serial]`, so there is no
+            // concurrent mutation in this process.
+            unsafe { std::env::remove_var(key) };
+            Self { key, original }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            match &self.original {
+                Some(value) => {
+                    // SAFETY: restoration runs in the same serial test context.
+                    unsafe { std::env::set_var(self.key, value) };
+                }
+                None => {
+                    // SAFETY: restoration runs in the same serial test context.
+                    unsafe { std::env::remove_var(self.key) };
+                }
+            }
+        }
+    }
+
+    struct CwdGuard {
+        original: PathBuf,
+    }
+
+    impl CwdGuard {
+        fn set(path: &Path) -> Self {
+            let original = std::env::current_dir().expect("current dir");
+            std::env::set_current_dir(path).expect("set current dir");
+            Self { original }
+        }
+    }
+
+    impl Drop for CwdGuard {
+        fn drop(&mut self) {
+            let _ = std::env::set_current_dir(&self.original);
+        }
+    }
+
+    fn set_fake_path(fakebin: &Path) -> EnvGuard {
+        let mut path = OsString::from(fakebin.as_os_str());
+        if let Some(existing) = std::env::var_os("PATH") {
+            path.push(if cfg!(windows) { ";" } else { ":" });
+            path.push(existing);
+        }
+        EnvGuard::set("PATH", path)
+    }
+
+    fn create_fake_pm_executable(fakebin: &Path, name: &str) -> PathBuf {
+        fs::create_dir_all(fakebin).expect("create fakebin");
+
+        #[cfg(windows)]
+        let executable = fakebin.join(format!("{name}.cmd"));
+        #[cfg(not(windows))]
+        let executable = fakebin.join(name);
+
+        #[cfg(windows)]
+        {
+            let script = r#"@echo off
+if not "%QBIT_FAKE_LOG%"=="" echo %*>>"%QBIT_FAKE_LOG%"
+if "%1"=="--version" (
+  echo 1.0.0
+  exit /b 0
+)
+exit /b 0
+"#;
+            fs::write(&executable, script).expect("write fake cmd");
+        }
+
+        #[cfg(not(windows))]
+        {
+            let script = r#"#!/bin/sh
+if [ -n "$QBIT_FAKE_LOG" ]; then
+  printf "%s\n" "$*" >> "$QBIT_FAKE_LOG"
+fi
+if [ "$1" = "--version" ]; then
+  echo "1.0.0"
+  exit 0
+fi
+exit 0
+"#;
+            fs::write(&executable, script).expect("write fake script");
+            let mut perms = fs::metadata(&executable).expect("metadata").permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&executable, perms).expect("set executable bit");
+        }
+
+        executable
+    }
+
+    fn read_log(log_path: &Path) -> String {
+        fs::read_to_string(log_path)
+            .unwrap_or_default()
+            .replace("\r\n", "\n")
+    }
 
     #[test]
     fn npm_and_yarn_use_expected_verbs() {
@@ -450,5 +572,112 @@ mod tests {
         let command = build_add_command(pm, "axios").expect("command");
         assert_eq!(command.pm, JsPackageManager::Pnpm);
         assert_eq!(command.args, vec!["add".to_string(), "axios".to_string()]);
+    }
+
+    #[test]
+    #[serial]
+    fn init_creates_scaffold_files() {
+        let tmp = tempdir().expect("tempdir");
+        let _cwd = CwdGuard::set(tmp.path());
+
+        init().expect("js init");
+
+        assert!(tmp.path().join("qbit.yml").exists());
+        assert!(tmp.path().join("package.json").exists());
+        assert!(tmp.path().join("src").join("index.js").exists());
+    }
+
+    #[test]
+    #[serial]
+    fn resolve_package_manager_prefers_first_available_candidate() {
+        let tmp = tempdir().expect("tempdir");
+        let _cwd = CwdGuard::set(tmp.path());
+        let _clear_override = EnvGuard::remove("QBIT_JS_PM");
+        let fakebin = tmp.path().join("fakebin");
+        create_fake_pm_executable(&fakebin, "bun");
+        create_fake_pm_executable(&fakebin, "pnpm");
+        create_fake_pm_executable(&fakebin, "yarn");
+        create_fake_pm_executable(&fakebin, "npm");
+        let _path = set_fake_path(&fakebin);
+
+        let pm = resolve_package_manager().expect("resolve package manager");
+        assert_eq!(pm, JsPackageManager::Bun);
+    }
+
+    #[test]
+    #[serial]
+    fn add_remove_and_run_use_fake_pm_and_log_args() {
+        let tmp = tempdir().expect("tempdir");
+        let _cwd = CwdGuard::set(tmp.path());
+
+        fs::write("package.json", "{}\n").expect("package.json");
+        let log_path = tmp.path().join("pm.log");
+        let fakebin = tmp.path().join("fakebin");
+        create_fake_pm_executable(&fakebin, "npm");
+
+        let _pm = EnvGuard::set("QBIT_JS_PM", "npm");
+        let _path = set_fake_path(&fakebin);
+        let _log = EnvGuard::set("QBIT_FAKE_LOG", log_path.as_os_str());
+
+        add_package("left-pad").expect("add package");
+        remove_package("left-pad").expect("remove package");
+        run_script("build", &["--watch".to_string()]).expect("run script");
+
+        let log = read_log(&log_path);
+        assert!(log.contains("install left-pad"), "log was: {log}");
+        assert!(log.contains("uninstall left-pad"), "log was: {log}");
+        assert!(log.contains("run build -- --watch"), "log was: {log}");
+    }
+
+    #[test]
+    #[serial]
+    fn snapshot_generated_qbit_template() {
+        let tmp = tempdir().expect("tempdir");
+        let _cwd = CwdGuard::set(tmp.path());
+
+        ensure_project_config_file().expect("write template");
+        let content = fs::read_to_string("qbit.yml")
+            .expect("template content")
+            .replace("\r\n", "\n");
+
+        insta::with_settings!({
+            snapshot_path => "../../snapshots",
+            prepend_module_to_snapshot => false,
+        }, {
+            insta::assert_snapshot!("js_qbit_yml_template", content);
+        });
+    }
+
+    #[test]
+    fn snapshot_npm_run_args_rendering() {
+        let args = JsPackageManager::Npm
+            .run_args(
+                "build",
+                &[
+                    "--watch".to_string(),
+                    "--mode".to_string(),
+                    "dev".to_string(),
+                ],
+            )
+            .join(" ");
+        insta::with_settings!({
+            snapshot_path => "../../snapshots",
+            prepend_module_to_snapshot => false,
+        }, {
+            insta::assert_snapshot!("js_npm_run_args", args);
+        });
+    }
+
+    #[test]
+    #[ignore = "Future behavior: lockfile-based selection should be validated end-to-end with fake executables."]
+    fn future_lockfile_based_detection_end_to_end() {
+        let _ = detect_by_lockfile();
+    }
+
+    #[test]
+    #[ignore = "Future behavior: assert yarn/bun verbs in full command execution matrix."]
+    fn future_yarn_bun_verbs_end_to_end() {
+        assert_eq!(JsPackageManager::Yarn.add_verb(), "add");
+        assert_eq!(JsPackageManager::Bun.remove_verb(), "remove");
     }
 }

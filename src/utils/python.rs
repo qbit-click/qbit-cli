@@ -48,3 +48,22 @@ fn split_first(cmd: &str) -> (&str, Vec<&str>) {
     let rest: Vec<&str> = parts.collect();
     (bin, rest)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn split_first_handles_py_launcher_flags() {
+        let (bin, rest) = split_first("py -3");
+        assert_eq!(bin, "py");
+        assert_eq!(rest, vec!["-3"]);
+    }
+
+    #[test]
+    fn split_first_handles_single_binary() {
+        let (bin, rest) = split_first("python3");
+        assert_eq!(bin, "python3");
+        assert!(rest.is_empty());
+    }
+}

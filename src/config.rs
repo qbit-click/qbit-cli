@@ -74,6 +74,10 @@ pub enum InstallSpec {
 }
 
 impl InstallSpec {
+    pub fn version(&self) -> Option<&str> {
+        self.configured_version()
+    }
+
     pub fn configured_version(&self) -> Option<&str> {
         match self {
             InstallSpec::Identifier(_) => None,
@@ -113,9 +117,9 @@ pub fn load_project_config_from_dir(base_dir: &Path) -> Result<Option<LoadedProj
         let content = fs::read_to_string(&path)
             .with_context(|| format!("reading project config at {}", path.display()))?;
         let data = match format {
-            ConfigFormat::Yaml => serde_yaml::from_str(&content)
+            ConfigFormat::Yaml => parse_yaml_str(&content)
                 .with_context(|| format!("parsing YAML config at {}", path.display()))?,
-            ConfigFormat::Toml => toml::from_str(&content)
+            ConfigFormat::Toml => parse_toml_str(&content)
                 .with_context(|| format!("parsing TOML config at {}", path.display()))?,
         };
         return Ok(Some(LoadedProjectConfig { path, data }));
@@ -123,39 +127,18 @@ pub fn load_project_config_from_dir(base_dir: &Path) -> Result<Option<LoadedProj
     Ok(None)
 }
 
+pub(crate) fn parse_yaml_str(content: &str) -> Result<ProjectConfig> {
+    Ok(serde_yaml::from_str(content)?)
+}
+
+pub(crate) fn parse_toml_str(content: &str) -> Result<ProjectConfig> {
+    Ok(toml::from_str(content)?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicU64, Ordering};
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    struct TempDir {
-        path: PathBuf,
-    }
-
-    impl TempDir {
-        fn new(prefix: &str) -> Self {
-            static COUNTER: AtomicU64 = AtomicU64::new(0);
-            let unique = COUNTER.fetch_add(1, Ordering::Relaxed);
-            let now = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("system clock")
-                .as_nanos();
-            let path = std::env::temp_dir().join(format!("qbit-cli-{prefix}-{now}-{unique}"));
-            fs::create_dir_all(&path).expect("create temp dir");
-            Self { path }
-        }
-
-        fn path(&self) -> &Path {
-            &self.path
-        }
-    }
-
-    impl Drop for TempDir {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.path);
-        }
-    }
+    use tempfile::tempdir;
 
     #[test]
     fn install_lookup_is_case_insensitive() {
@@ -192,7 +175,7 @@ mod tests {
 
     #[test]
     fn parses_yaml_scripts_and_install_shapes() {
-        let tmp = TempDir::new("yaml-parse");
+        let tmp = tempdir().expect("temp dir");
         let yaml = r#"scripts:
   hello: "echo hi"
   build:
@@ -238,14 +221,14 @@ install:
         let (_, python_spec) = loaded
             .install_target_case_insensitive("python")
             .expect("python install spec");
-        assert_eq!(python_spec.configured_version(), Some("3.12"));
+        assert_eq!(python_spec.version(), Some("3.12"));
         assert_eq!(python_spec.identifier("winget"), Some("Python.Python.3.12"));
         assert_eq!(python_spec.identifier("brew"), Some("python@3.12"));
     }
 
     #[test]
     fn parses_toml_scripts_and_install_shapes() {
-        let tmp = TempDir::new("toml-parse");
+        let tmp = tempdir().expect("temp dir");
         let toml = r#"[scripts]
 hello = "echo hi"
 build = ["cargo build", "cargo test"]
@@ -291,8 +274,53 @@ brew = "python@3.12"
         let (_, python_spec) = loaded
             .install_target_case_insensitive("python")
             .expect("python install spec");
-        assert_eq!(python_spec.configured_version(), Some("3.12"));
+        assert_eq!(python_spec.version(), Some("3.12"));
         assert_eq!(python_spec.identifier("winget"), Some("Python.Python.3.12"));
         assert_eq!(python_spec.identifier("brew"), Some("python@3.12"));
+    }
+
+    #[test]
+    fn parse_yaml_str_handles_single_and_multiple_scripts() {
+        let yaml = r#"scripts:
+  one: "echo hi"
+  many:
+    - "cargo build"
+    - "cargo test"
+"#;
+        let parsed = parse_yaml_str(yaml).expect("yaml parse");
+        assert_eq!(
+            parsed.scripts.get("one").expect("one command").commands(),
+            vec!["echo hi".to_string()]
+        );
+        assert_eq!(
+            parsed.scripts.get("many").expect("many command").commands(),
+            vec!["cargo build".to_string(), "cargo test".to_string()]
+        );
+    }
+
+    #[test]
+    fn parse_toml_str_handles_install_identifier_and_detailed_forms() {
+        let toml = r#"[install]
+java = "Oracle.JavaRuntimeEnvironment"
+
+[install.python]
+version = "3.12"
+
+[install.python.identifiers]
+winget = "Python.Python.3.12"
+default = "python"
+"#;
+        let parsed = parse_toml_str(toml).expect("toml parse");
+
+        let java = parsed.install.get("java").expect("java install");
+        assert_eq!(
+            java.global_identifier(),
+            Some("Oracle.JavaRuntimeEnvironment")
+        );
+
+        let python = parsed.install.get("python").expect("python install");
+        assert_eq!(python.version(), Some("3.12"));
+        assert_eq!(python.identifier("winget"), Some("Python.Python.3.12"));
+        assert_eq!(python.identifier("default"), Some("python"));
     }
 }

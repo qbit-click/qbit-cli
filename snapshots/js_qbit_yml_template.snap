@@ -1,0 +1,22 @@
+---
+source: src/developers/js.rs
+expression: content
+---
+scripts:
+  dev: "npm run dev"
+  lint:
+    - "qbit py init"
+    - "python -m flake8"
+
+install:
+  postgres:
+    version: "15"
+    identifiers:
+      apt: "postgresql"
+      winget: "PostgreSQL.PostgreSQL"
+  redis:
+    version: "7.2"
+    identifiers:
+      apt: "redis-server"
+      winget: "Redis.Redis-CLI"
+

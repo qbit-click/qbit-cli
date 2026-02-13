@@ -165,3 +165,20 @@ fn split_first(cmd: &str) -> (&str, Vec<&str>) {
     let rest: Vec<&str> = parts.collect();
     (bin, rest)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn venv_python_path_is_platform_specific() {
+        let path = venv_python_path();
+        let rendered = path.to_string_lossy();
+
+        #[cfg(windows)]
+        assert!(rendered.ends_with("venv\\Scripts\\python.exe"));
+
+        #[cfg(not(windows))]
+        assert!(rendered.ends_with("venv/bin/python"));
+    }
+}
