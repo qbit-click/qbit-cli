@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 
 use crate::config::load_project_config;
 use crate::utils::shell;
@@ -9,11 +9,7 @@ pub fn run_named_script(name: &str) -> Result<()> {
     };
 
     let Some(entry) = cfg.script(name) else {
-        bail!(
-            "Script `{}` not found in {}",
-            name,
-            cfg.path.display()
-        );
+        bail!("Script `{}` not found in {}", name, cfg.path.display());
     };
 
     let commands = entry.commands();

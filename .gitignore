@@ -1,5 +1,5 @@
-/target
-.idea
-.vscode
-qbit-cli.iml
+/target/
 /dev-sandbox/
+.idea/
+.vscode/
+*.iml

@@ -1,9 +1,9 @@
 mod cli;
+mod config;
 mod developers;
 mod os;
 mod tools;
 mod utils;
-mod config;
 
 fn main() {
     if let Ok(root) = std::env::var("QBIT_PROJECT_ROOT") {

@@ -1,2 +1,3 @@
 [alias]
 dev = "run --bin qbit-dev"
+dev-clean = "run --bin qbit-dev -- --reset-sandbox"

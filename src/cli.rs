@@ -18,6 +18,12 @@ pub enum Commands {
     Install {
         /// Package to install
         target: String,
+        /// Print the resolved installer command without executing it
+        #[arg(long)]
+        dry_run: bool,
+        /// Prefer non-interactive mode (adds `-y`/equivalent where supported)
+        #[arg(long)]
+        yes: bool,
     },
     /// Python-related commands
     Py {
@@ -73,10 +79,13 @@ pub enum JsCommands {
         /// Package name
         package: String,
     },
-    /// Run an npm/yarn/pnpm script
+    /// Run an npm/pnpm/yarn/bun script
     Run {
         /// Script name under package.json scripts
         script: String,
+        /// Extra arguments forwarded to the script after `--`
+        #[arg(last = true, allow_hyphen_values = true)]
+        args: Vec<String>,
     },
 }
 
@@ -85,15 +94,17 @@ pub enum JsCommands {
 pub enum DartCommands {
     /// Initialize a Dart/Flutter project
     Init,
-    /// Add a package
+    /// Add one or more packages
     Add {
-        /// Package name
-        package: String,
+        /// Package names
+        #[arg(required = true, num_args = 1..)]
+        packages: Vec<String>,
     },
-    /// Remove a package
+    /// Remove one or more packages
     Remove {
-        /// Package name
-        package: String,
+        /// Package names
+        #[arg(required = true, num_args = 1..)]
+        packages: Vec<String>,
     },
 }
 
@@ -102,8 +113,12 @@ pub fn run() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Install { target } => {
-            if let Err(e) = install::install_target(&target) {
+        Commands::Install {
+            target,
+            dry_run,
+            yes,
+        } => {
+            if let Err(e) = install::install_target(&target, dry_run, yes) {
                 eprintln!("error (install): {e}");
                 std::process::exit(1);
             }
@@ -153,8 +168,8 @@ pub fn run() {
                     std::process::exit(1);
                 }
             }
-            JsCommands::Run { script } => {
-                if let Err(e) = js::run_script(&script) {
+            JsCommands::Run { script, args } => {
+                if let Err(e) = js::run_script(&script, &args) {
                     eprintln!("error (js run): {e}");
                     std::process::exit(1);
                 }
@@ -167,14 +182,14 @@ pub fn run() {
                     std::process::exit(1);
                 }
             }
-            DartCommands::Add { package } => {
-                if let Err(e) = dart::add_package(&package) {
+            DartCommands::Add { packages } => {
+                if let Err(e) = dart::add_packages(&packages) {
                     eprintln!("error (dart add): {e}");
                     std::process::exit(1);
                 }
             }
-            DartCommands::Remove { package } => {
-                if let Err(e) = dart::remove_package(&package) {
+            DartCommands::Remove { packages } => {
+                if let Err(e) = dart::remove_packages(&packages) {
                     eprintln!("error (dart remove): {e}");
                     std::process::exit(1);
                 }

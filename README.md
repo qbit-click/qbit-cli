@@ -9,7 +9,7 @@ Qbit is a cross-platform developer command line that turns repetitive environmen
   qbit install java
   qbit install chrome:127.0.0.0
   ```
-  Qbit detects the native package manager (`winget`, `brew`, `apt`, `choco`, or `scoop`), maps the logical name to the correct package ID, and installs the exact version you request.
+  Qbit detects an available native package manager at runtime (`apt-get`, `dnf`, `pacman`, `zypper`, `brew`, `winget`, `choco`, `scoop`), maps the logical name to the correct package ID, and installs the requested version when the manager supports pinning.
 
 - **Project bootstrapping**
   ```bash
@@ -62,6 +62,9 @@ install:
 - `qbit run build-all` executes the commands sequentially.
 - `qbit install postgres` installs version 15 and automatically chooses the correct package ID for each platform.
 - Inline overrides are supported: `qbit install chrome:127.0.0.0`.
+- `install.<name>: "Some.Identifier"` is treated as a shared identifier for all package managers.
+- Use `qbit install <name[:version]> --dry-run` to print the exact installer command without executing it.
+- Version pinning is package-manager dependent; unsupported cases return a clear actionable error.
 
 ## Installers & PATH integration
 
@@ -69,9 +72,9 @@ Every release ships with platform-specific setup archives:
 
 | Platform | Asset | Inside the archive |
 |----------|-------|--------------------|
-| Windows  | `qbit-windows-setup.zip` | `qbit-cli.exe`, `install.ps1` (adds to `Program Files\Qbit` and updates PATH), icon |
-| macOS    | `qbit-macos-setup.tar.gz` | `qbit-cli`, `install_macos.sh` (drops a `.app` bundle + symlink), icon |
-| Linux    | `qbit-linux-setup.tar.gz` | `qbit-cli`, `install.sh` (copies to `/opt/qbit` + `/usr/local/bin/qbit` symlink), optional GPG signature |
+| Windows  | `qbit-windows-setup.zip` | `qbit-cli.exe`, `install.ps1`, `uninstall.ps1`, icon |
+| macOS    | `qbit-macos-setup.tar.gz` | `qbit-cli`, `install_macos.sh`, `uninstall_macos.sh`, icon |
+| Linux    | `qbit-linux-setup.tar.gz` | `qbit-cli`, `install.sh`, `uninstall.sh`, optional GPG signature |
 
 Usage example on Linux/macOS:
 ```bash
@@ -79,11 +82,11 @@ tar -xzf qbit-linux-setup.tar.gz
 sudo ./install.sh
 qbit --help
 ```
-On Windows, extract the archive, right-click `install.ps1` → *Run with PowerShell* (or execute from an elevated terminal). The script copies the binary and appends the destination to the system PATH, so the `qbit` command is available globally.
+On Windows, extract the archive and run `install.ps1`. By default it installs per-user under `%LOCALAPPDATA%\Qbit\bin` and updates the user PATH (no admin required). For machine-wide install, run with elevation and `-Scope Machine`. Use `uninstall.ps1` to remove the binary and PATH entry.
 
 ## Supported Commands
 
-- `qbit install <name[:version]>` – Install operating-system dependencies via native package managers.
+- `qbit install <name[:version]> [--yes] [--dry-run]` – Install operating-system dependencies via detected package managers (`QBIT_PACKAGE_MANAGER` can force one).
 - `qbit run <script>` – Execute custom workflows defined in configuration.
 - `qbit py <init|add|remove>` – Python virtualenv management with automatic `requirements.txt` updates.
 - `qbit js <init|add|remove|run>` – JavaScript project scaffolding, npm/yarn/pnpm/bun integration, and script execution.
@@ -100,7 +103,7 @@ cargo build --release
 ./target/release/qbit --help
 ```
 
-Rust 1.76+ is recommended. The repository also includes `cargo dev` for sandbox testing inside `dev-sandbox/`.
+Rust 1.85+ (edition 2024) is required. The repository also includes `cargo dev` for sandbox testing inside `dev-sandbox/`, and `cargo dev-clean` to reset the sandbox directory.
 
 ## Contributing
 

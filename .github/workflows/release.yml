@@ -18,12 +18,18 @@ jobs:
           - os: ubuntu-latest
             artifact: linux
             binary_name: qbit-cli
+            install_script: install.sh
+            uninstall_script: uninstall.sh
           - os: macos-latest
             artifact: macos
             binary_name: qbit-cli
+            install_script: install_macos.sh
+            uninstall_script: uninstall_macos.sh
           - os: windows-latest
             artifact: windows
             binary_name: qbit-cli.exe
+            install_script: install.ps1
+            uninstall_script: uninstall.ps1
 
     steps:
       - name: Checkout
@@ -105,7 +111,8 @@ jobs:
           if [ "${{ matrix.os }}" = "ubuntu-latest" ] && [ -f "target/release/${{ matrix.binary_name }}.sig" ]; then
             cp target/release/${{ matrix.binary_name }}.sig dist/
           fi
-          cp scripts/install/* dist/ 2>/dev/null || true
+          cp "scripts/install/${{ matrix.install_script }}" dist/
+          cp "scripts/install/${{ matrix.uninstall_script }}" dist/
           cp assets/icon.svg dist/
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             powershell Compress-Archive -Path dist\* -DestinationPath qbit-${{ matrix.artifact }}-setup.zip

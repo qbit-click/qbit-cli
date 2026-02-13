@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use std::process::{Command, Stdio};
 
 pub fn run_shell(command: &str) -> Result<()> {
