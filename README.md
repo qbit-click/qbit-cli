@@ -87,6 +87,7 @@ On Windows, extract the archive and run `install.ps1`. By default it installs pe
 ## Supported Commands
 
 - `qbit install <name[:version]> [--yes] [--dry-run]` – Install operating-system dependencies via detected package managers (`QBIT_PACKAGE_MANAGER` can force one).
+- `qbit upgrade` – Check the latest GitHub release and install it when a newer version is available.
 - `qbit run <script>` – Execute custom workflows defined in configuration.
 - `qbit py <init|add|remove>` – Python virtualenv management with automatic `requirements.txt` updates.
 - `qbit js <init|add|remove|run>` – JavaScript project scaffolding, npm/yarn/pnpm/bun integration, and script execution.

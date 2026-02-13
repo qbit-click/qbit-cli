@@ -1,13 +1,10 @@
-use assert_cmd::Command;
-
 fn normalize_output(output: &[u8]) -> String {
     String::from_utf8_lossy(output).replace("\r\n", "\n")
 }
 
 #[test]
 fn cli_help_prints_expected_banner() {
-    let assert = Command::cargo_bin("qbit-cli")
-        .expect("binary")
+    let assert = assert_cmd::cargo::cargo_bin_cmd!("qbit-cli")
         .arg("--help")
         .assert()
         .success();

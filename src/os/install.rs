@@ -386,7 +386,7 @@ mod tests {
 
             let result = parse_target_spec(&spec);
             if let Ok((resolved_name, _)) = result {
-                prop_assert_eq!(resolved_name.trim(), resolved_name);
+                prop_assert_eq!(resolved_name.trim(), resolved_name.as_str());
                 prop_assert!(!resolved_name.is_empty());
             }
         }

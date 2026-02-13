@@ -1,5 +1,5 @@
 use crate::developers::{dart, js, py};
-use crate::os::install;
+use crate::os::{install, upgrade};
 use crate::tools::runner;
 use clap::{Parser, Subcommand};
 
@@ -45,6 +45,8 @@ pub enum Commands {
         #[command(subcommand)]
         sub: DartCommands,
     },
+    /// Download and install the latest qbit release from GitHub
+    Upgrade,
 }
 
 /// Python subcommands
@@ -195,5 +197,11 @@ pub fn run() {
                 }
             }
         },
+        Commands::Upgrade => {
+            if let Err(e) = upgrade::upgrade() {
+                eprintln!("error (upgrade): {e}");
+                std::process::exit(1);
+            }
+        }
     }
 }

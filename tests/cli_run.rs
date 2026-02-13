@@ -1,6 +1,5 @@
 use std::fs;
 
-use assert_cmd::Command;
 use predicates::prelude::*;
 use tempfile::tempdir;
 
@@ -16,8 +15,7 @@ fn run_named_script_from_temp_project_succeeds() {
 "#;
     fs::write(tmp.path().join("qbit.yml"), config).expect("write qbit.yml");
 
-    Command::cargo_bin("qbit-cli")
-        .expect("binary")
+    assert_cmd::cargo::cargo_bin_cmd!("qbit-cli")
         .current_dir(tmp.path())
         .args(["run", "hello"])
         .assert()
@@ -33,8 +31,7 @@ fn run_missing_script_returns_actionable_error() {
 "#;
     fs::write(tmp.path().join("qbit.yml"), config).expect("write qbit.yml");
 
-    let assert = Command::cargo_bin("qbit-cli")
-        .expect("binary")
+    let assert = assert_cmd::cargo::cargo_bin_cmd!("qbit-cli")
         .current_dir(tmp.path())
         .args(["run", "missing_script"])
         .assert()
