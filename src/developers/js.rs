@@ -143,12 +143,7 @@ impl JsCommandSpec {
 fn run_package_manager(command: &JsCommandSpec) -> Result<()> {
     println!("Using JavaScript package manager: {}", command.pm.name());
     println!("{}", command.render());
-    let status = Command::new(command.pm.executable())
-        .args(&command.args)
-        .stdin(Stdio::inherit())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .status()
+    let status = run_js_command(command.pm.executable(), &command.args)
         .with_context(|| format!("spawning {}", command.pm.executable()))?;
 
     if !status.success() {
@@ -159,6 +154,30 @@ fn run_package_manager(command: &JsCommandSpec) -> Result<()> {
         );
     }
     Ok(())
+}
+
+fn run_js_command(executable: &str, args: &[String]) -> std::io::Result<std::process::ExitStatus> {
+    #[cfg(windows)]
+    {
+        Command::new("cmd")
+            .arg("/C")
+            .arg(executable)
+            .args(args)
+            .stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .status()
+    }
+
+    #[cfg(not(windows))]
+    {
+        Command::new(executable)
+            .args(args)
+            .stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .status()
+    }
 }
 
 fn resolve_package_manager() -> Result<JsPackageManager> {
@@ -240,14 +259,29 @@ where
 }
 
 fn command_available(cmd: &str) -> bool {
-    Command::new(cmd)
-        .arg("--version")
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map(|st| st.success())
-        .unwrap_or(false)
+    #[cfg(windows)]
+    {
+        Command::new("cmd")
+            .args(["/C", cmd, "--version"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map(|st| st.success())
+            .unwrap_or(false)
+    }
+
+    #[cfg(not(windows))]
+    {
+        Command::new(cmd)
+            .arg("--version")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map(|st| st.success())
+            .unwrap_or(false)
+    }
 }
 
 fn build_add_command(pm: JsPackageManager, package: &str) -> Result<JsCommandSpec> {
