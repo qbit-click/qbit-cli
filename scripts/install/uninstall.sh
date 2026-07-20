@@ -4,6 +4,7 @@ set -euo pipefail
 BIN_TARGET=${BIN_TARGET:-/usr/local/bin}
 APP_DIR=${APP_DIR:-/opt/qbit}
 
+sudo rm -f "$BIN_TARGET/qbit-cli"
 sudo rm -f "$BIN_TARGET/qbit"
 sudo rm -f "$APP_DIR/qbit"
 

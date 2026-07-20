@@ -30,4 +30,5 @@ APP
 # 📝 یک فایل icon.icns واقعی در این مسیر قرار دهید.
 
 sudo ln -sf "$APP_DIR/Contents/MacOS/qbit" "$BIN_TARGET/qbit"
+sudo ln -sf "$APP_DIR/Contents/MacOS/qbit" "$BIN_TARGET/qbit-cli"
 echo "Qbit CLI app installed. You may run 'qbit' globally."

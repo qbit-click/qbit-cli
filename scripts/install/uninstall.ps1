@@ -59,6 +59,7 @@ Ensure-AdministratorIfMachineScope -installScope $Scope
 
 $binDir = Join-Path $Destination "bin"
 $binaryPath = Join-Path $binDir "qbit.exe"
+$binaryPath = Join-Path $binDir "qbit-cli.exe"
 
 if (Test-Path -LiteralPath $binaryPath) {
     Remove-Item -LiteralPath $binaryPath -Force

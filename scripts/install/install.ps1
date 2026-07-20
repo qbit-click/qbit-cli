@@ -69,6 +69,7 @@ if (-not (Test-Path -LiteralPath $binaryPath)) {
 
 $binDir = Join-Path $Destination "bin"
 New-Item -ItemType Directory -Force -Path $binDir | Out-Null
+Copy-Item -LiteralPath $binaryPath -Destination (Join-Path $binDir "qbit-cli.exe") -Force
 Copy-Item -LiteralPath $binaryPath -Destination (Join-Path $binDir "qbit.exe") -Force
 
 $target = if ($Scope -eq "Machine") { [System.EnvironmentVariableTarget]::Machine } else { [System.EnvironmentVariableTarget]::User }
