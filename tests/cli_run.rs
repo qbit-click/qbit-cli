@@ -15,7 +15,7 @@ fn run_named_script_from_temp_project_succeeds() {
 "#;
     fs::write(tmp.path().join("qbit.yml"), config).expect("write qbit.yml");
 
-    assert_cmd::cargo::cargo_bin_cmd!("qbit-cli")
+    assert_cmd::cargo::cargo_bin_cmd!("qbit")
         .current_dir(tmp.path())
         .args(["run", "hello"])
         .assert()
@@ -31,7 +31,7 @@ fn run_missing_script_returns_actionable_error() {
 "#;
     fs::write(tmp.path().join("qbit.yml"), config).expect("write qbit.yml");
 
-    let assert = assert_cmd::cargo::cargo_bin_cmd!("qbit-cli")
+    let assert = assert_cmd::cargo::cargo_bin_cmd!("qbit")
         .current_dir(tmp.path())
         .args(["run", "missing_script"])
         .assert()

@@ -4,7 +4,7 @@ fn normalize_output(output: &[u8]) -> String {
 
 #[test]
 fn cli_help_prints_expected_banner() {
-    let assert = assert_cmd::cargo::cargo_bin_cmd!("qbit-cli")
+    let assert = assert_cmd::cargo::cargo_bin_cmd!("qbit")
         .arg("--help")
         .assert()
         .success();
