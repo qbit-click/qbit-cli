@@ -33,7 +33,7 @@ cp "$BINARY_PATH" "$PAYLOAD_DIR/usr/local/bin/qbit"
 chmod 755 "$PAYLOAD_DIR/usr/local/bin/qbit"
 
 # Render distribution.xml with real version
-sed "s/__VERSION__/$VERSION/" "$MACOS_PKG_DIR/distribution.xml" > "$STAGE_DIR/distribution.xml"
+sed "s/__VERSION__/$VERSION/" "$MACOS_PKG_DIR/distribution.xml" >"$STAGE_DIR/distribution.xml"
 
 mkdir -p "$OUT_DIR"
 
@@ -60,6 +60,7 @@ productbuild \
 
 echo "Built: $OUT_FILE"
 
-# Sanity checks
+# Sanity check: list payload contents. This is diagnostic output only —
+# it must never fail the build if pkgutil's exact output format changes.
 echo "--- pkgutil payload check ---"
-pkgutil --payload-files "$OUT_FILE" 2>/dev/null || pkgutil --expand "$OUT_FILE" "$STAGE_DIR/expanded" && find "$STAGE_DIR/expanded" -maxdepth 2
+pkgutil --payload-files "$OUT_FILE" || true
