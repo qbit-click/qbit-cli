@@ -17,19 +17,16 @@ jobs:
         include:
           - os: ubuntu-latest
             artifact: linux
-            binary_name: qbit-cli
-            install_script: install.sh
-            uninstall_script: uninstall.sh
+            binary_name: qbit
+            arch: amd64
           - os: macos-latest
             artifact: macos
-            binary_name: qbit-cli
-            install_script: install_macos.sh
-            uninstall_script: uninstall_macos.sh
+            binary_name: qbit
+            arch: arm64
           - os: windows-latest
             artifact: windows
-            binary_name: qbit-cli.exe
-            install_script: install.ps1
-            uninstall_script: uninstall.ps1
+            binary_name: qbit.exe
+            arch: x64
 
     steps:
       - name: Checkout
@@ -103,30 +100,79 @@ jobs:
             --passphrase "$GPG_PASSPHRASE" \
             --output target/release/${{ matrix.binary_name }}.sig \
             --detach-sign target/release/${{ matrix.binary_name }}
-      - name: Package artifacts
+      - name: Extract version from tag
+        id: version
         shell: bash
         run: |
-          mkdir -p dist
-          cp target/release/${{ matrix.binary_name }} dist/
-          if [ "${{ matrix.os }}" = "ubuntu-latest" ] && [ -f "target/release/${{ matrix.binary_name }}.sig" ]; then
-            cp target/release/${{ matrix.binary_name }}.sig dist/
+          # GITHUB_REF_NAME is e.g. "v1.2.3" -> strip the leading v
+          version="${GITHUB_REF_NAME#v}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Install WiX (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: dotnet tool install --global wix
+
+      - name: Build Linux .deb
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          chmod +x scripts/package/build-linux-deb.sh
+          ./scripts/package/build-linux-deb.sh \
+            "${{ steps.version.outputs.version }}" \
+            "${{ matrix.arch }}" \
+            "target/release/${{ matrix.binary_name }}" \
+            dist
+
+      - name: Build macOS .pkg
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          chmod +x scripts/package/build-macos.sh
+          ./scripts/package/build-macos.sh \
+            "${{ steps.version.outputs.version }}" \
+            "${{ matrix.arch }}" \
+            "target/release/${{ matrix.binary_name }}" \
+            dist
+
+      - name: Build Windows .msi
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          .\scripts\package\build-windows.ps1 `
+            -Version "${{ steps.version.outputs.version }}" `
+            -Arch "${{ matrix.arch }}" `
+            -BinaryPath "target\release\${{ matrix.binary_name }}" `
+            -OutDir dist
+
+      - name: Verify exactly one installer was produced
+        shell: bash
+        run: |
+          count=$(find dist -maxdepth 1 -type f \( -name "*.deb" -o -name "*.pkg" -o -name "*.msi" \) | wc -l)
+          if [ "$count" -ne 1 ]; then
+            echo "error: expected exactly 1 installer in dist/, found $count" >&2
+            find dist -maxdepth 1 -type f >&2
+            exit 1
           fi
-          cp "scripts/install/${{ matrix.install_script }}" dist/
-          cp "scripts/install/${{ matrix.uninstall_script }}" dist/
-          cp assets/icon.svg dist/
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            powershell Compress-Archive -Path dist\* -DestinationPath qbit-${{ matrix.artifact }}-setup.zip
-          else
-            tar -czf qbit-${{ matrix.artifact }}-setup.tar.gz -C dist .
-          fi
+
+      - name: Generate SHA-256 checksums
+        shell: bash
+        run: |
+          cd dist
+          for f in *.deb *.pkg *.msi; do
+            [ -f "$f" ] || continue
+            sha256sum "$f" > "$f.sha256" 2>/dev/null || shasum -a 256 "$f" > "$f.sha256"
+          done
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: qbit-${{ matrix.artifact }}
           path: |
-            qbit-${{ matrix.artifact }}-setup.zip
-            qbit-${{ matrix.artifact }}-setup.tar.gz
+            dist/*.deb
+            dist/*.pkg
+            dist/*.msi
+            dist/*.sha256
 
   release:
     name: publish

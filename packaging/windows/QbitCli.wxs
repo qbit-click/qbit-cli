@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+
+  <!--
+    IMPORTANT: This UpgradeCode must NEVER change between releases.
+    It is what lets a newer MSI detect and replace an older install
+    instead of installing side-by-side. Generate this GUID once, then
+    hardcode it forever.
+  -->
+  <Package
+      Name="Qbit CLI"
+      Manufacturer="Qbit"
+      Version="$(var.ProductVersion)"
+      UpgradeCode="6f2b6e2a-6b8f-4b7a-9f6d-2b6b6e2a6f2b"
+      Language="1033"
+      Scope="perUser">
+
+    <MajorUpgrade
+        DowngradeErrorMessage="A newer version of Qbit CLI is already installed."
+        Schedule="afterInstallInitialize" />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="INSTALLFOLDER" Name="Qbit">
+        <Directory Id="BINFOLDER" Name="bin" />
+      </Directory>
+    </StandardDirectory>
+
+    <Feature Id="MainFeature" Title="Qbit CLI" Level="1">
+      <ComponentRef Id="QbitExecutable" />
+      <ComponentRef Id="PathEntry" />
+    </Feature>
+
+    <!-- The actual binary -->
+    <Component Id="QbitExecutable" Directory="BINFOLDER" Guid="*">
+      <File Id="QbitExe" Source="$(var.QbitBinaryPath)" Name="qbit.exe" KeyPath="yes" />
+    </Component>
+
+    <!-- Add bin dir to the user's PATH, once, without duplicating -->
+    <Component Id="PathEntry" Directory="BINFOLDER" Guid="*">
+      <RegistryValue
+          Root="HKCU"
+          Key="Software\QbitCli"
+          Name="Installed"
+          Type="integer"
+          Value="1"
+          KeyPath="yes" />
+      <Environment
+          Id="PATH"
+          Name="PATH"
+          Value="[BINFOLDER]"
+          Permanent="no"
+          Part="last"
+          Action="set"
+          System="no" />
+    </Component>
+
+    <Icon Id="QbitIcon.ico" SourceFile="$(var.IconPath)" />
+    <Property Id="ARPPRODUCTICON" Value="QbitIcon.ico" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+
+  </Package>
+</Wix>

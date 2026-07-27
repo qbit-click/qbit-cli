@@ -1,0 +1,8 @@
+Package: cli-qbit
+Version: 0.1.3
+Section: utils
+Priority: optional
+Architecture: __ARCH__
+Maintainer: Qbit CLI 
+Description: Qbit CLI
+ 

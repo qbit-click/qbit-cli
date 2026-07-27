@@ -25,3 +25,7 @@ tempfile = "3.15.0"
 serial_test = "3.2.0"
 proptest = "1.6.0"
 insta = "1.42.2"
+
+[[bin]]
+name = "qbit"
+path = "src/main.rs"

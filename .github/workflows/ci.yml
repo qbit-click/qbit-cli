@@ -11,7 +11,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            binary_name: qbit
+            arch: amd64
+          - os: windows-latest
+            binary_name: qbit.exe
+            arch: x64
+          - os: macos-latest
+            binary_name: qbit
+            arch: arm64
 
     steps:
       - name: Checkout
@@ -37,3 +46,82 @@ jobs:
 
       - name: Build
         run: cargo build --release
+
+      - name: Verify binary name (Cargo [[bin]] check)
+        shell: bash
+        run: |
+          if [ ! -f "target/release/${{ matrix.binary_name }}" ]; then
+            echo "error: expected target/release/${{ matrix.binary_name }} — Cargo.toml [[bin]] naming may be wrong" >&2
+            find target/release -maxdepth 1 -type f >&2
+            exit 1
+          fi
+
+      # --- Packaging E2E: build an unsigned, disposable test package on every PR ---
+      # This never creates a GitHub release or tag; dist/ is discarded at job end.
+
+      - name: Install WiX (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: dotnet tool install --global wix
+
+      - name: Build test .deb (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          chmod +x scripts/package/build-linux-deb.sh
+          ./scripts/package/build-linux-deb.sh 0.0.0-ci "${{ matrix.arch }}" \
+            "target/release/${{ matrix.binary_name }}" dist
+
+      - name: E2E install / run / uninstall (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          set -euo pipefail
+          pkg=$(find dist -maxdepth 1 -name "*.deb" | head -n1)
+          sudo dpkg -i "$pkg"
+          out="$(qbit --version)"
+          echo "qbit --version -> $out"
+          sudo dpkg -r cli-qbit
+          if command -v qbit >/dev/null 2>&1; then
+            echo "error: qbit still on PATH after uninstall" >&2
+            exit 1
+          fi
+
+      - name: Build test .pkg (macOS)
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          chmod +x scripts/package/build-macos.sh
+          ./scripts/package/build-macos.sh 0.0.0-ci "${{ matrix.arch }}" \
+            "target/release/${{ matrix.binary_name }}" dist
+
+      - name: E2E install / run / uninstall (macOS)
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          set -euo pipefail
+          pkg=$(find dist -maxdepth 1 -name "*.pkg" | head -n1)
+          sudo installer -pkg "$pkg" -target /
+          out="$(/usr/local/bin/qbit --version)"
+          echo "qbit --version -> $out"
+          sudo pkgutil --forget com.qbit-click.qbit-cli
+          sudo rm -f /usr/local/bin/qbit
+
+      - name: Build test .msi (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          .\scripts\package\build-windows.ps1 -Version "0.0.0-ci" -Arch "${{ matrix.arch }}" `
+            -BinaryPath "target\release\${{ matrix.binary_name }}" -OutDir dist
+
+      - name: E2E install / run / uninstall (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $msi = Get-ChildItem dist\*.msi | Select-Object -First 1
+          Start-Process msiexec.exe -ArgumentList "/i `"$($msi.FullName)`" /qn" -Wait
+          # Refresh PATH for this process from the machine+user environment
+          $env:Path = [Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [Environment]::GetEnvironmentVariable("Path","User")
+          $out = & qbit --version
+          Write-Host "qbit --version -> $out"
+          Start-Process msiexec.exe -ArgumentList "/x `"$($msi.FullName)`" /qn" -Wait
