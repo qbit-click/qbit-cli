@@ -79,8 +79,8 @@ jobs:
           set -euo pipefail
           pkg=$(find dist -maxdepth 1 -name "*.deb" | head -n1)
           sudo dpkg -i "$pkg"
-          out="$(qbit --version)"
-          echo "qbit --version -> $out"
+          out="$(qbit --help)"
+          echo "qbit --help -> $out"
           sudo dpkg -r cli-qbit
           if command -v qbit >/dev/null 2>&1; then
             echo "error: qbit still on PATH after uninstall" >&2
@@ -102,8 +102,8 @@ jobs:
           set -euo pipefail
           pkg=$(find dist -maxdepth 1 -name "*.pkg" | head -n1)
           sudo installer -pkg "$pkg" -target /
-          out="$(/usr/local/bin/qbit --version)"
-          echo "qbit --version -> $out"
+          out="$(/usr/local/bin/qbit --help)"
+          echo "qbit --help -> $out"
           sudo pkgutil --forget com.qbit-click.qbit-cli
           sudo rm -f /usr/local/bin/qbit
 
@@ -122,6 +122,6 @@ jobs:
           Start-Process msiexec.exe -ArgumentList "/i `"$($msi.FullName)`" /qn" -Wait
           # Refresh PATH for this process from the machine+user environment
           $env:Path = [Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [Environment]::GetEnvironmentVariable("Path","User")
-          $out = & qbit --version
-          Write-Host "qbit --version -> $out"
+          $out = & qbit --help
+          Write-Host "qbit --help -> $out"
           Start-Process msiexec.exe -ArgumentList "/x `"$($msi.FullName)`" /qn" -Wait
