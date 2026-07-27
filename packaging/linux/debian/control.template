@@ -1,8 +1,9 @@
 Package: cli-qbit
-Version: 0.1.3
+Version: __VERSION__
 Section: utils
 Priority: optional
 Architecture: __ARCH__
-Maintainer: Qbit CLI 
+Maintainer: Qbit CLI <maintainers@qbit-click.example>
 Description: Qbit CLI
+ Command-line tool for Qbit workflows.
  

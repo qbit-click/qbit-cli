@@ -39,9 +39,14 @@ mkdir -p "$PKG_ROOT/DEBIAN"
 cp "$BINARY_PATH" "$PKG_ROOT/usr/bin/qbit"
 chmod 755 "$PKG_ROOT/usr/bin/qbit"
 
-# Render control file with real version/arch
+# Render control file with real version/arch.
+# Also strip CR characters (in case the template was saved with CRLF
+# line endings) and any blank lines — dpkg-deb's parser is strict and
+# a blank line inside/after a multi-line field is an error.
 sed -e "s/__VERSION__/$VERSION/" -e "s/__ARCH__/$ARCH/" \
-  "$CONTROL_TEMPLATE" > "$PKG_ROOT/DEBIAN/control"
+  "$CONTROL_TEMPLATE" |
+  tr -d '\r' |
+  sed '/^[[:space:]]*$/d' >"$PKG_ROOT/DEBIAN/control"
 
 mkdir -p "$OUT_DIR"
 OUT_FILE="$OUT_DIR/${PKG_NAME}.deb"

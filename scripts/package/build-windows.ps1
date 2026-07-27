@@ -28,7 +28,7 @@ if (-not (Test-Path -LiteralPath $wxsPath)) {
     throw "WiX source not found at $wxsPath"
 }
 if (-not (Test-Path -LiteralPath $iconPath)) {
-    throw "Icon not found at $iconPath (expected assets\icon.svg)"
+    throw "Icon not found at $iconPath (expected assets\icon.ico)"
 }
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
