@@ -20,7 +20,11 @@ if [ ! -f "$BINARY_PATH" ]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONTROL_TEMPLATE="$SCRIPT_DIR/../linux/debian/control.template"
+# This script lives at scripts/package/build-linux-deb.sh
+# The template lives at packaging/linux/debian/control.template
+# Both are two levels under repo root, so go up two then down into packaging/
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+CONTROL_TEMPLATE="$REPO_ROOT/packaging/linux/debian/control.template"
 
 STAGE_DIR="$(mktemp -d)"
 trap 'rm -rf "$STAGE_DIR"' EXIT

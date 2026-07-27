@@ -38,12 +38,15 @@ sed "s/__VERSION__/$VERSION/" "$MACOS_PKG_DIR/distribution.xml" > "$STAGE_DIR/di
 mkdir -p "$OUT_DIR"
 
 # Step 1: build the component package (the actual payload)
+# Note: no --component-plist here. That option is for .app bundles
+# (it declares bundle relocation/versioning behavior); our payload is
+# a plain binary at usr/local/bin/qbit, so --root + --install-location
+# is sufficient and correct.
 pkgbuild \
   --root "$PAYLOAD_DIR" \
   --identifier "com.qbit-click.qbit-cli" \
   --version "$VERSION" \
   --install-location "/" \
-  --component-plist "$MACOS_PKG_DIR/component.plist" \
   "$STAGE_DIR/component.pkg"
 
 # Step 2: wrap it in a product archive using the distribution.xml
