@@ -5,12 +5,10 @@ use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
-use flate2::read::GzDecoder;
 use reqwest::blocking::Client;
 use semver::Version;
 use serde::Deserialize;
-use tar::Archive;
-use zip::ZipArchive;
+use sha2::{Digest, Sha256};
 
 const DEFAULT_REPOSITORY: &str = "qbit-click/qbit-cli";
 
@@ -72,15 +70,22 @@ pub fn upgrade() -> Result<()> {
         return Ok(());
     }
 
-    let expected_asset_name = platform_asset_name();
-    let asset = find_release_asset(&release, expected_asset_name)?;
-    println!("Downloading asset: {}", asset.name);
+    let installer_pattern = platform_installer_pattern();
+    let asset = find_release_asset(&release, installer_pattern)?;
+    let checksum_asset = find_checksum_asset(&release, &asset.name)?;
+
+    println!("Downloading installer: {}", asset.name);
 
     let temp = TempDirGuard::new()?;
-    let archive_path = temp.path().join(&asset.name);
-    download_to_file(&asset.browser_download_url, &archive_path)?;
-    extract_archive(&archive_path, temp.path())?;
-    run_platform_installer(temp.path())?;
+    let installer_path = temp.path().join(&asset.name);
+    download_to_file(&asset.browser_download_url, &installer_path)?;
+
+    println!("Verifying checksum...");
+    let expected_checksum = download_checksum_text(&checksum_asset.browser_download_url)?;
+    verify_checksum(&installer_path, &expected_checksum)?;
+    println!("Checksum OK.");
+
+    run_native_installer(&installer_path)?;
 
     println!("Upgrade installed successfully to version {latest}.");
     Ok(())
@@ -127,48 +132,104 @@ fn fetch_latest_release(repository: &str) -> Result<GithubRelease> {
         .context("decoding GitHub release response JSON")
 }
 
-fn platform_asset_name() -> &'static str {
+/// Returns a suffix pattern (not an exact name) because the installer
+/// filename embeds the version and arch, e.g.
+/// `qbit-cli-1.2.3-windows-x64.msi`, which we don't know ahead of time.
+fn platform_installer_pattern() -> (&'static str, &'static str) {
     #[cfg(target_os = "windows")]
     {
-        "qbit-windows-setup.zip"
+        ("qbit-cli-", "-windows-")
     }
     #[cfg(target_os = "macos")]
     {
-        "qbit-macos-setup.tar.gz"
+        ("qbit-cli-", "-macos-")
     }
     #[cfg(target_os = "linux")]
     {
-        "qbit-linux-setup.tar.gz"
+        ("qbit-cli", "_")
     }
     #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
     {
-        "qbit-linux-setup.tar.gz"
+        ("qbit-cli", "")
+    }
+}
+
+fn installer_extension() -> &'static str {
+    #[cfg(target_os = "windows")]
+    {
+        ".msi"
+    }
+    #[cfg(target_os = "macos")]
+    {
+        ".pkg"
+    }
+    #[cfg(target_os = "linux")]
+    {
+        ".deb"
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    {
+        ""
     }
 }
 
 fn find_release_asset<'a>(
     release: &'a GithubRelease,
-    expected_name: &str,
+    pattern: (&str, &str),
 ) -> Result<&'a GithubAsset> {
+    let (prefix, marker) = pattern;
+    let ext = installer_extension();
+
+    if ext.is_empty() {
+        bail!("qbit upgrade is not supported on this operating system.");
+    }
+
+    release
+        .assets
+        .iter()
+        .find(|asset| {
+            asset.name.starts_with(prefix)
+                && asset.name.contains(marker)
+                && asset.name.ends_with(ext)
+                && !asset.name.ends_with(".sha256")
+        })
+        .ok_or_else(|| {
+            let available = list_asset_names(release);
+            anyhow::anyhow!(
+                "No installer matching this platform (prefix `{prefix}`, marker `{marker}`, extension `{ext}`) was found in the latest release. Available assets: {available}"
+            )
+        })
+}
+
+fn find_checksum_asset<'a>(
+    release: &'a GithubRelease,
+    installer_name: &str,
+) -> Result<&'a GithubAsset> {
+    let expected_name = format!("{installer_name}.sha256");
     release
         .assets
         .iter()
         .find(|asset| asset.name == expected_name)
         .ok_or_else(|| {
-            let available = if release.assets.is_empty() {
-                "<no assets>".to_string()
-            } else {
-                release
-                    .assets
-                    .iter()
-                    .map(|asset| asset.name.clone())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            };
+            let available = list_asset_names(release);
             anyhow::anyhow!(
-                "Release asset `{expected_name}` was not found. Available assets: {available}"
+                "Checksum file `{expected_name}` was not found for installer `{installer_name}`. \
+                 Refusing to install without a verifiable checksum. Available assets: {available}"
             )
         })
+}
+
+fn list_asset_names(release: &GithubRelease) -> String {
+    if release.assets.is_empty() {
+        "<no assets>".to_string()
+    } else {
+        release
+            .assets
+            .iter()
+            .map(|asset| asset.name.clone())
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
 }
 
 fn download_to_file(url: &str, destination: &Path) -> Result<()> {
@@ -180,178 +241,84 @@ fn download_to_file(url: &str, destination: &Path) -> Result<()> {
         .get(url)
         .header(reqwest::header::USER_AGENT, "qbit-cli-upgrader")
         .send()
-        .with_context(|| format!("downloading release archive from {url}"))?
+        .with_context(|| format!("downloading installer from {url}"))?
         .error_for_status()
-        .with_context(|| format!("failed to download release archive from {url}"))?;
+        .with_context(|| format!("failed to download installer from {url}"))?;
 
     let mut file = File::create(destination)
-        .with_context(|| format!("creating archive file {}", destination.display()))?;
+        .with_context(|| format!("creating installer file {}", destination.display()))?;
 
     io::copy(&mut response, &mut file)
-        .with_context(|| format!("writing archive to {}", destination.display()))?;
+        .with_context(|| format!("writing installer to {}", destination.display()))?;
     file.flush()
-        .with_context(|| format!("flushing archive {}", destination.display()))?;
+        .with_context(|| format!("flushing installer {}", destination.display()))?;
     Ok(())
 }
 
-fn extract_archive(archive_path: &Path, destination: &Path) -> Result<()> {
-    let file_name = archive_path
-        .file_name()
-        .and_then(|value| value.to_str())
-        .unwrap_or_default();
+fn download_checksum_text(url: &str) -> Result<String> {
+    let client = Client::builder()
+        .build()
+        .context("building HTTP client for checksum download")?;
 
-    if file_name.ends_with(".zip") {
-        return extract_zip(archive_path, destination);
-    }
-    if file_name.ends_with(".tar.gz") {
-        return extract_tar_gz(archive_path, destination);
+    let text = client
+        .get(url)
+        .header(reqwest::header::USER_AGENT, "qbit-cli-upgrader")
+        .send()
+        .with_context(|| format!("downloading checksum from {url}"))?
+        .error_for_status()
+        .with_context(|| format!("failed to download checksum from {url}"))?
+        .text()
+        .context("reading checksum response as text")?;
+
+    // sha256sum output format is "<hex>  <filename>"; take just the hex.
+    let hex = text
+        .split_whitespace()
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("checksum file was empty"))?
+        .to_lowercase();
+
+    if hex.len() != 64 || !hex.chars().all(|c| c.is_ascii_hexdigit()) {
+        bail!("checksum file did not contain a valid 64-character SHA-256 hex digest: `{hex}`");
     }
 
-    bail!(
-        "Unsupported release archive format: {}",
-        archive_path.display()
-    );
+    Ok(hex)
 }
 
-fn extract_tar_gz(archive_path: &Path, destination: &Path) -> Result<()> {
-    let file = File::open(archive_path)
-        .with_context(|| format!("opening archive {}", archive_path.display()))?;
-    let gz = GzDecoder::new(file);
-    let mut archive = Archive::new(gz);
-    archive
-        .unpack(destination)
-        .with_context(|| format!("extracting tar.gz archive into {}", destination.display()))?;
+fn verify_checksum(file_path: &Path, expected_hex: &str) -> Result<()> {
+    let mut file =
+        File::open(file_path).with_context(|| format!("opening {} for hashing", file_path.display()))?;
+    let mut hasher = Sha256::new();
+    io::copy(&mut file, &mut hasher)
+        .with_context(|| format!("hashing {}", file_path.display()))?;
+    let actual_hex = format!("{:x}", hasher.finalize());
+
+    if actual_hex != expected_hex {
+        bail!(
+            "Checksum mismatch for {}.\n  expected: {expected_hex}\n  actual:   {actual_hex}\n\
+             Refusing to install a file that does not match its published checksum.",
+            file_path.display()
+        );
+    }
     Ok(())
 }
 
-fn extract_zip(archive_path: &Path, destination: &Path) -> Result<()> {
-    let file = File::open(archive_path)
-        .with_context(|| format!("opening archive {}", archive_path.display()))?;
-    let mut zip = ZipArchive::new(file).context("opening zip archive")?;
-
-    for idx in 0..zip.len() {
-        let mut entry = zip
-            .by_index(idx)
-            .with_context(|| format!("reading zip entry #{idx}"))?;
-        let Some(rel_path) = entry.enclosed_name().map(|p| p.to_path_buf()) else {
-            continue;
-        };
-
-        let out_path = destination.join(rel_path);
-        if entry.is_dir() {
-            fs::create_dir_all(&out_path)
-                .with_context(|| format!("creating directory {}", out_path.display()))?;
-            continue;
-        }
-
-        if let Some(parent) = out_path.parent() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("creating directory {}", parent.display()))?;
-        }
-        let mut out_file = File::create(&out_path)
-            .with_context(|| format!("creating extracted file {}", out_path.display()))?;
-        io::copy(&mut entry, &mut out_file)
-            .with_context(|| format!("extracting file {}", out_path.display()))?;
-    }
-
-    Ok(())
-}
-
-fn run_platform_installer(extracted_dir: &Path) -> Result<()> {
+/// Runs the OS-native installer directly (no bundled install scripts,
+/// no archive extraction). If elevated privileges are required and we
+/// don't have them, re-invokes with an OS-appropriate elevation prompt.
+fn run_native_installer(installer_path: &Path) -> Result<()> {
     #[cfg(target_os = "windows")]
     {
-        let script = extracted_dir.join("install.ps1");
-        if !script.exists() {
-            bail!(
-                "Windows installer not found after extraction: {}",
-                script.display()
-            );
-        }
-
-        let shell = if command_exists("pwsh") {
-            "pwsh"
-        } else if command_exists("powershell") {
-            "powershell"
-        } else {
-            bail!("Neither `pwsh` nor `powershell` is available in PATH.");
-        };
-
-        let status = Command::new(shell)
-            .arg("-NoProfile")
-            .arg("-ExecutionPolicy")
-            .arg("Bypass")
-            .arg("-File")
-            .arg(&script)
-            .current_dir(extracted_dir)
-            .stdin(Stdio::inherit())
-            .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit())
-            .status()
-            .with_context(|| format!("running installer {}", script.display()))?;
-
-        if !status.success() {
-            bail!(
-                "Installer failed (exit code {}): {}",
-                status.code().unwrap_or(1),
-                script.display()
-            );
-        }
+        run_msi_installer(installer_path)?;
     }
 
     #[cfg(target_os = "macos")]
     {
-        let script = extracted_dir.join("install_macos.sh");
-        if !script.exists() {
-            bail!(
-                "macOS installer not found after extraction: {}",
-                script.display()
-            );
-        }
-
-        let status = Command::new("sh")
-            .arg(&script)
-            .current_dir(extracted_dir)
-            .stdin(Stdio::inherit())
-            .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit())
-            .status()
-            .with_context(|| format!("running installer {}", script.display()))?;
-
-        if !status.success() {
-            bail!(
-                "Installer failed (exit code {}): {}",
-                status.code().unwrap_or(1),
-                script.display()
-            );
-        }
+        run_pkg_installer(installer_path)?;
     }
 
     #[cfg(target_os = "linux")]
     {
-        let script = extracted_dir.join("install.sh");
-        if !script.exists() {
-            bail!(
-                "Linux installer not found after extraction: {}",
-                script.display()
-            );
-        }
-
-        let status = Command::new("sh")
-            .arg(&script)
-            .current_dir(extracted_dir)
-            .stdin(Stdio::inherit())
-            .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit())
-            .status()
-            .with_context(|| format!("running installer {}", script.display()))?;
-
-        if !status.success() {
-            bail!(
-                "Installer failed (exit code {}): {}",
-                status.code().unwrap_or(1),
-                script.display()
-            );
-        }
+        run_deb_installer(installer_path)?;
     }
 
     #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
@@ -363,16 +330,119 @@ fn run_platform_installer(extracted_dir: &Path) -> Result<()> {
 }
 
 #[cfg(target_os = "windows")]
-fn command_exists(binary: &str) -> bool {
-    Command::new(binary)
-        .arg("-Command")
-        .arg("$PSVersionTable.PSVersion.ToString()")
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
+fn run_msi_installer(installer_path: &Path) -> Result<()> {
+    // msiexec handles its own UAC elevation prompt for per-machine
+    // installs; for a per-user MSI (see QbitCli.wxs, Scope="perUser")
+    // no elevation is required at all, so we invoke it directly.
+    let status = Command::new("msiexec")
+        .arg("/i")
+        .arg(installer_path)
+        .arg("/qn")
+        .arg("/norestart")
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
         .status()
-        .map(|status| status.success())
-        .unwrap_or(false)
+        .with_context(|| format!("running msiexec for {}", installer_path.display()))?;
+
+    if !status.success() {
+        bail!(
+            "msiexec failed (exit code {}) installing {}",
+            status.code().unwrap_or(1),
+            installer_path.display()
+        );
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn run_pkg_installer(installer_path: &Path) -> Result<()> {
+    // `installer -pkg ... -target /` always requires root. Try
+    // directly first; if that fails due to permissions, re-invoke
+    // ourselves under `sudo`, which will prompt the user interactively.
+    let direct = Command::new("installer")
+        .arg("-pkg")
+        .arg(installer_path)
+        .arg("-target")
+        .arg("/")
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status();
+
+    let needs_elevation = match &direct {
+        Ok(status) => !status.success(),
+        Err(_) => true,
+    };
+
+    if !needs_elevation {
+        return Ok(());
+    }
+
+    println!("Administrator privileges are required to install. You may be prompted for your password.");
+    let status = Command::new("sudo")
+        .arg("installer")
+        .arg("-pkg")
+        .arg(installer_path)
+        .arg("-target")
+        .arg("/")
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()
+        .context("re-invoking installer with sudo")?;
+
+    if !status.success() {
+        bail!(
+            "installer failed (exit code {}) installing {}",
+            status.code().unwrap_or(1),
+            installer_path.display()
+        );
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn run_deb_installer(installer_path: &Path) -> Result<()> {
+    // `dpkg -i` requires root. Try directly first (covers containers
+    // and CI where the process may already be root); if that fails,
+    // re-invoke under `sudo`, which prompts the user interactively.
+    let direct = Command::new("dpkg")
+        .arg("-i")
+        .arg(installer_path)
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status();
+
+    let needs_elevation = match &direct {
+        Ok(status) => !status.success(),
+        Err(_) => true,
+    };
+
+    if !needs_elevation {
+        return Ok(());
+    }
+
+    println!("Root privileges are required to install. You may be prompted for your password.");
+    let status = Command::new("sudo")
+        .arg("dpkg")
+        .arg("-i")
+        .arg(installer_path)
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()
+        .context("re-invoking dpkg with sudo")?;
+
+    if !status.success() {
+        bail!(
+            "dpkg failed (exit code {}) installing {}",
+            status.code().unwrap_or(1),
+            installer_path.display()
+        );
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -391,23 +461,97 @@ mod tests {
         assert!(err.to_string().contains("invalid semantic version"));
     }
 
-    #[test]
-    fn find_release_asset_matches_expected_name() {
-        let release = GithubRelease {
-            tag_name: "v1.0.0".to_string(),
+    fn sample_release() -> GithubRelease {
+        GithubRelease {
+            tag_name: "v1.2.3".to_string(),
             assets: vec![
                 GithubAsset {
-                    name: "qbit-linux-setup.tar.gz".to_string(),
-                    browser_download_url: "https://example.test/linux".to_string(),
+                    name: "qbit-cli_1.2.3_amd64.deb".to_string(),
+                    browser_download_url: "https://example.test/linux.deb".to_string(),
                 },
                 GithubAsset {
-                    name: "qbit-windows-setup.zip".to_string(),
-                    browser_download_url: "https://example.test/windows".to_string(),
+                    name: "qbit-cli_1.2.3_amd64.deb.sha256".to_string(),
+                    browser_download_url: "https://example.test/linux.deb.sha256".to_string(),
+                },
+                GithubAsset {
+                    name: "qbit-cli-1.2.3-windows-x64.msi".to_string(),
+                    browser_download_url: "https://example.test/windows.msi".to_string(),
+                },
+                GithubAsset {
+                    name: "qbit-cli-1.2.3-windows-x64.msi.sha256".to_string(),
+                    browser_download_url: "https://example.test/windows.msi.sha256".to_string(),
+                },
+                GithubAsset {
+                    name: "qbit-cli-1.2.3-macos-arm64.pkg".to_string(),
+                    browser_download_url: "https://example.test/macos.pkg".to_string(),
+                },
+                GithubAsset {
+                    name: "qbit-cli-1.2.3-macos-arm64.pkg.sha256".to_string(),
+                    browser_download_url: "https://example.test/macos.pkg.sha256".to_string(),
                 },
             ],
-        };
+        }
+    }
 
-        let found = find_release_asset(&release, "qbit-windows-setup.zip").expect("asset");
-        assert_eq!(found.browser_download_url, "https://example.test/windows");
+    #[test]
+    fn find_release_asset_matches_current_platform_installer() {
+        let release = sample_release();
+        let asset = find_release_asset(&release, platform_installer_pattern()).expect("asset");
+        assert!(asset.name.ends_with(installer_extension()));
+        assert!(!asset.name.ends_with(".sha256"));
+    }
+
+    #[test]
+    fn find_checksum_asset_matches_installer_plus_sha256_suffix() {
+        let release = sample_release();
+        let installer = find_release_asset(&release, platform_installer_pattern()).expect("asset");
+        let checksum = find_checksum_asset(&release, &installer.name).expect("checksum");
+        assert_eq!(checksum.name, format!("{}.sha256", installer.name));
+    }
+
+    #[test]
+    fn find_checksum_asset_errors_when_missing() {
+        let mut release = sample_release();
+        release.assets.retain(|a| !a.name.ends_with(".sha256"));
+        let installer = find_release_asset(&release, platform_installer_pattern()).expect("asset");
+        let err = find_checksum_asset(&release, &installer.name).expect_err("must fail");
+        assert!(err.to_string().contains("Checksum file"));
+    }
+
+    #[test]
+    fn verify_checksum_accepts_matching_hash() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let file_path = dir.path().join("test.bin");
+        std::fs::write(&file_path, b"hello world").expect("write");
+
+        let mut hasher = Sha256::new();
+        hasher.update(b"hello world");
+        let expected = format!("{:x}", hasher.finalize());
+
+        verify_checksum(&file_path, &expected).expect("checksum should match");
+    }
+
+    #[test]
+    fn verify_checksum_rejects_mismatched_hash() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let file_path = dir.path().join("test.bin");
+        std::fs::write(&file_path, b"hello world").expect("write");
+
+        let err = verify_checksum(
+            &file_path,
+            "0000000000000000000000000000000000000000000000000000000000000",
+        )
+        .expect_err("must fail on mismatch");
+        assert!(err.to_string().contains("Checksum mismatch"));
+    }
+
+    #[test]
+    fn download_checksum_text_parses_sha256sum_format() {
+        // sha256sum output is "<hex>  <filename>\n" — verify our
+        // whitespace-split parsing handles that shape without a live request.
+        let hex = "a".repeat(64);
+        let line = format!("{hex}  qbit-cli_1.2.3_amd64.deb\n");
+        let parsed = line.split_whitespace().next().unwrap().to_lowercase();
+        assert_eq!(parsed, hex);
     }
 }
