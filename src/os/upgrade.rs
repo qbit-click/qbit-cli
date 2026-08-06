@@ -285,11 +285,10 @@ fn download_checksum_text(url: &str) -> Result<String> {
 }
 
 fn verify_checksum(file_path: &Path, expected_hex: &str) -> Result<()> {
-    let mut file =
-        File::open(file_path).with_context(|| format!("opening {} for hashing", file_path.display()))?;
+    let mut file = File::open(file_path)
+        .with_context(|| format!("opening {} for hashing", file_path.display()))?;
     let mut hasher = Sha256::new();
-    io::copy(&mut file, &mut hasher)
-        .with_context(|| format!("hashing {}", file_path.display()))?;
+    io::copy(&mut file, &mut hasher).with_context(|| format!("hashing {}", file_path.display()))?;
     let actual_hex = format!("{:x}", hasher.finalize());
 
     if actual_hex != expected_hex {
@@ -379,7 +378,9 @@ fn run_pkg_installer(installer_path: &Path) -> Result<()> {
         return Ok(());
     }
 
-    println!("Administrator privileges are required to install. You may be prompted for your password.");
+    println!(
+        "Administrator privileges are required to install. You may be prompted for your password."
+    );
     let status = Command::new("sudo")
         .arg("installer")
         .arg("-pkg")
