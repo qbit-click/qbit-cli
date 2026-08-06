@@ -124,7 +124,7 @@ if ! pkgutil --expand-full "$OUT_FILE" "$EXPAND_DIR" 2>/dev/null; then
 fi
 
 PAYLOAD_FILES="$(pkgutil --payload-files "$OUT_FILE" 2>/dev/null || true)"
-if ! echo "$PAYLOAD_FILES" | grep -qx "usr/local/bin/qbit"; then
+if ! echo "$PAYLOAD_FILES" | grep -qE '(^|/)usr/local/bin/qbit$'; then
   echo "error: expected payload usr/local/bin/qbit not found in built package" >&2
   echo "Actual payload contents:" >&2
   echo "$PAYLOAD_FILES" >&2

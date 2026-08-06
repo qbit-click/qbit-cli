@@ -81,7 +81,7 @@ jobs:
           sudo dpkg -i "$pkg"
           out="$(qbit --help)"
           echo "qbit --help -> $out"
-          sudo dpkg -r cli-qbit
+          sudo dpkg -r qbit-cli
           if command -v qbit >/dev/null 2>&1; then
             echo "error: qbit still on PATH after uninstall" >&2
             exit 1
