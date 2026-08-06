@@ -69,7 +69,7 @@ jobs:
         shell: bash
         run: |
           chmod +x scripts/package/build-linux-deb.sh
-          ./scripts/package/build-linux-deb.sh 0.0.0-ci "${{ matrix.arch }}" \
+          ./scripts/package/build-linux-deb.sh 0.0.1 "${{ matrix.arch }}" \
             "target/release/${{ matrix.binary_name }}" dist
 
       - name: E2E install / run / uninstall (Linux)
@@ -92,7 +92,7 @@ jobs:
         shell: bash
         run: |
           chmod +x scripts/package/build-macos.sh
-          ./scripts/package/build-macos.sh 0.0.0-ci "${{ matrix.arch }}" \
+          ./scripts/package/build-macos.sh 0.0.1 "${{ matrix.arch }}" \
             "target/release/${{ matrix.binary_name }}" dist
 
       - name: E2E install / run / uninstall (macOS)
@@ -111,7 +111,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          .\scripts\package\build-windows.ps1 -Version "0.0.0-ci" -Arch "${{ matrix.arch }}" `
+          .\scripts\package\build-windows.ps1 -Version "0.0.1" -Arch "${{ matrix.arch }}" `
             -BinaryPath "target\release\${{ matrix.binary_name }}" -OutDir dist
 
       - name: E2E install / run / uninstall (Windows)
