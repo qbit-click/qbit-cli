@@ -8,7 +8,9 @@ use anyhow::{Context, Result, bail};
 use reqwest::blocking::Client;
 use semver::Version;
 use serde::Deserialize;
-use sha2::{Digest, Sha256};
+
+use crate::os::update::checksum;
+use crate::os::update::platform::{self, Platform};
 
 const DEFAULT_REPOSITORY: &str = "qbit-click/qbit-cli";
 
@@ -70,8 +72,14 @@ pub fn upgrade() -> Result<()> {
         return Ok(());
     }
 
-    let installer_pattern = platform_installer_pattern();
-    let asset = find_release_asset(&release, installer_pattern)?;
+    let current_platform = Platform::current()?;
+    let asset_names: Vec<&str> = release.assets.iter().map(|a| a.name.as_str()).collect();
+    let asset_name = platform::select_asset(current_platform, &asset_names)?;
+    let asset = release
+        .assets
+        .iter()
+        .find(|a| a.name == asset_name)
+        .expect("select_asset returned a name that must exist in the source list");
     let checksum_asset = find_checksum_asset(&release, &asset.name)?;
 
     println!("Downloading installer: {}", asset.name);
@@ -81,8 +89,9 @@ pub fn upgrade() -> Result<()> {
     download_to_file(&asset.browser_download_url, &installer_path)?;
 
     println!("Verifying checksum...");
-    let expected_checksum = download_checksum_text(&checksum_asset.browser_download_url)?;
-    verify_checksum(&installer_path, &expected_checksum)?;
+    let checksum_text = download_checksum_text(&checksum_asset.browser_download_url)?;
+    let expected_checksum = checksum::parse_checksum_text(&checksum_text)?;
+    checksum::verify_file(&installer_path, &expected_checksum)?;
     println!("Checksum OK.");
 
     run_native_installer(&installer_path)?;
@@ -130,75 +139,6 @@ fn fetch_latest_release(repository: &str) -> Result<GithubRelease> {
     response
         .json::<GithubRelease>()
         .context("decoding GitHub release response JSON")
-}
-
-/// Returns a suffix pattern (not an exact name) because the installer
-/// filename embeds the version and arch, e.g.
-/// `qbit-cli-1.2.3-windows-x64.msi`, which we don't know ahead of time.
-fn platform_installer_pattern() -> (&'static str, &'static str) {
-    #[cfg(target_os = "windows")]
-    {
-        ("qbit-cli-", "-windows-")
-    }
-    #[cfg(target_os = "macos")]
-    {
-        ("qbit-cli-", "-macos-")
-    }
-    #[cfg(target_os = "linux")]
-    {
-        ("qbit-cli", "_")
-    }
-    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-    {
-        ("qbit-cli", "")
-    }
-}
-
-fn installer_extension() -> &'static str {
-    #[cfg(target_os = "windows")]
-    {
-        ".msi"
-    }
-    #[cfg(target_os = "macos")]
-    {
-        ".pkg"
-    }
-    #[cfg(target_os = "linux")]
-    {
-        ".deb"
-    }
-    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-    {
-        ""
-    }
-}
-
-fn find_release_asset<'a>(
-    release: &'a GithubRelease,
-    pattern: (&str, &str),
-) -> Result<&'a GithubAsset> {
-    let (prefix, marker) = pattern;
-    let ext = installer_extension();
-
-    if ext.is_empty() {
-        bail!("qbit upgrade is not supported on this operating system.");
-    }
-
-    release
-        .assets
-        .iter()
-        .find(|asset| {
-            asset.name.starts_with(prefix)
-                && asset.name.contains(marker)
-                && asset.name.ends_with(ext)
-                && !asset.name.ends_with(".sha256")
-        })
-        .ok_or_else(|| {
-            let available = list_asset_names(release);
-            anyhow::anyhow!(
-                "No installer matching this platform (prefix `{prefix}`, marker `{marker}`, extension `{ext}`) was found in the latest release. Available assets: {available}"
-            )
-        })
 }
 
 fn find_checksum_asset<'a>(
@@ -260,7 +200,7 @@ fn download_checksum_text(url: &str) -> Result<String> {
         .build()
         .context("building HTTP client for checksum download")?;
 
-    let text = client
+    client
         .get(url)
         .header(reqwest::header::USER_AGENT, "qbit-cli-upgrader")
         .send()
@@ -268,37 +208,7 @@ fn download_checksum_text(url: &str) -> Result<String> {
         .error_for_status()
         .with_context(|| format!("failed to download checksum from {url}"))?
         .text()
-        .context("reading checksum response as text")?;
-
-    // sha256sum output format is "<hex>  <filename>"; take just the hex.
-    let hex = text
-        .split_whitespace()
-        .next()
-        .ok_or_else(|| anyhow::anyhow!("checksum file was empty"))?
-        .to_lowercase();
-
-    if hex.len() != 64 || !hex.chars().all(|c| c.is_ascii_hexdigit()) {
-        bail!("checksum file did not contain a valid 64-character SHA-256 hex digest: `{hex}`");
-    }
-
-    Ok(hex)
-}
-
-fn verify_checksum(file_path: &Path, expected_hex: &str) -> Result<()> {
-    let mut file = File::open(file_path)
-        .with_context(|| format!("opening {} for hashing", file_path.display()))?;
-    let mut hasher = Sha256::new();
-    io::copy(&mut file, &mut hasher).with_context(|| format!("hashing {}", file_path.display()))?;
-    let actual_hex = format!("{:x}", hasher.finalize());
-
-    if actual_hex != expected_hex {
-        bail!(
-            "Checksum mismatch for {}.\n  expected: {expected_hex}\n  actual:   {actual_hex}\n\
-             Refusing to install a file that does not match its published checksum.",
-            file_path.display()
-        );
-    }
-    Ok(())
+        .context("reading checksum response as text")
 }
 
 /// Runs the OS-native installer directly (no bundled install scripts,
@@ -497,62 +407,53 @@ mod tests {
     #[test]
     fn find_release_asset_matches_current_platform_installer() {
         let release = sample_release();
-        let asset = find_release_asset(&release, platform_installer_pattern()).expect("asset");
-        assert!(asset.name.ends_with(installer_extension()));
-        assert!(!asset.name.ends_with(".sha256"));
+        let current_platform = Platform::current().expect("platform");
+        let asset_names: Vec<&str> = release.assets.iter().map(|a| a.name.as_str()).collect();
+        let asset_name =
+            platform::select_asset(current_platform, &asset_names).expect("asset");
+        assert!(asset_name.ends_with(current_platform.installer_extension()));
+        assert!(!asset_name.ends_with(".sha256"));
     }
 
     #[test]
     fn find_checksum_asset_matches_installer_plus_sha256_suffix() {
         let release = sample_release();
-        let installer = find_release_asset(&release, platform_installer_pattern()).expect("asset");
-        let checksum = find_checksum_asset(&release, &installer.name).expect("checksum");
-        assert_eq!(checksum.name, format!("{}.sha256", installer.name));
+        let current_platform = Platform::current().expect("platform");
+        let asset_names: Vec<&str> = release.assets.iter().map(|a| a.name.as_str()).collect();
+        let asset_name =
+            platform::select_asset(current_platform, &asset_names).expect("asset");
+        let checksum = find_checksum_asset(&release, asset_name).expect("checksum");
+        assert_eq!(checksum.name, format!("{asset_name}.sha256"));
     }
 
     #[test]
     fn find_checksum_asset_errors_when_missing() {
         let mut release = sample_release();
         release.assets.retain(|a| !a.name.ends_with(".sha256"));
-        let installer = find_release_asset(&release, platform_installer_pattern()).expect("asset");
-        let err = find_checksum_asset(&release, &installer.name).expect_err("must fail");
+        let current_platform = Platform::current().expect("platform");
+        let asset_names: Vec<&str> = release.assets.iter().map(|a| a.name.as_str()).collect();
+        let asset_name =
+            platform::select_asset(current_platform, &asset_names).expect("asset");
+        let err = find_checksum_asset(&release, asset_name).expect_err("must fail");
         assert!(err.to_string().contains("Checksum file"));
     }
 
     #[test]
-    fn verify_checksum_accepts_matching_hash() {
+    fn checksum_verification_round_trips_through_shared_module() {
+        // Confirms upgrade.rs is actually exercising the shared
+        // os::update::checksum module end-to-end (parse + verify),
+        // not a local duplicate of this logic.
         let dir = tempfile::tempdir().expect("tempdir");
         let file_path = dir.path().join("test.bin");
         std::fs::write(&file_path, b"hello world").expect("write");
 
-        let mut hasher = Sha256::new();
+        let mut hasher = sha2::Sha256::new();
+        use sha2::Digest;
         hasher.update(b"hello world");
-        let expected = format!("{:x}", hasher.finalize());
+        let hex = format!("{:x}", hasher.finalize());
+        let checksum_file_text = format!("{hex}  test.bin\n");
 
-        verify_checksum(&file_path, &expected).expect("checksum should match");
-    }
-
-    #[test]
-    fn verify_checksum_rejects_mismatched_hash() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let file_path = dir.path().join("test.bin");
-        std::fs::write(&file_path, b"hello world").expect("write");
-
-        let err = verify_checksum(
-            &file_path,
-            "0000000000000000000000000000000000000000000000000000000000000",
-        )
-        .expect_err("must fail on mismatch");
-        assert!(err.to_string().contains("Checksum mismatch"));
-    }
-
-    #[test]
-    fn download_checksum_text_parses_sha256sum_format() {
-        // sha256sum output is "<hex>  <filename>\n" — verify our
-        // whitespace-split parsing handles that shape without a live request.
-        let hex = "a".repeat(64);
-        let line = format!("{hex}  qbit-cli_1.2.3_amd64.deb\n");
-        let parsed = line.split_whitespace().next().unwrap().to_lowercase();
-        assert_eq!(parsed, hex);
+        let parsed = checksum::parse_checksum_text(&checksum_file_text).expect("parse");
+        checksum::verify_file(&file_path, &parsed).expect("checksum should match");
     }
 }
