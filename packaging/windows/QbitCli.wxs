@@ -2,31 +2,20 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
 
   <!--
-    UpgradeCode must NEVER change between releases — this is what lets
-    a newer MSI detect and cleanly replace an older install instead of
-    installing side-by-side. Generate this GUID exactly once for the
-    project and hardcode it here forever. (Requirement 3.6)
-
-    ProductVersion and Platform/Architecture are supplied by the build
-    script via -d ProductVersion=... and -arch ..., never hardcoded.
-    (Requirement 3.9)
+    IMPORTANT: This UpgradeCode must NEVER change again from this
+    point forward. It is what lets a newer MSI detect and cleanly
+    replace an older install instead of installing side-by-side.
+    This value (2f08e9ad-31e0-4fe7-bc10-967c0aeedf04) is final —
+    generated once and locked in. Do not regenerate it.
   -->
   <Package
       Name="Qbit CLI"
       Manufacturer="Qbit"
       Version="$(var.ProductVersion)"
-      UpgradeCode="6f2b6e2a-6b8f-4b7a-9f6d-2b6b6e2a6f2b"
+      UpgradeCode="2f08e9ad-31e0-4fe7-bc10-967c0aeedf04"
       Language="1033"
       Scope="perUser">
 
-    <!--
-      MajorUpgrade with this schedule:
-      - installs the new version and removes the old one automatically
-        when the new version is newer (Requirement 3.7)
-      - rejects installation with a clear message when the running
-        installer's version is older than what's already installed
-        (Requirement 3.8)
-    -->
     <MajorUpgrade
         DowngradeErrorMessage="A newer version of Qbit CLI is already installed. Uninstall it first if you need to downgrade."
         Schedule="afterInstallInitialize" />
@@ -34,8 +23,8 @@
     <MediaTemplate EmbedCab="yes" />
 
     <!--
-      Per-user install path, matching the documented convention exactly:
-      %LOCALAPPDATA%\Programs\Qbit CLI\bin\qbit.exe (Requirement 3.1)
+      Per-user install path: %LOCALAPPDATA%\Programs\Qbit CLI\bin\qbit.exe
+      matching the documented installation convention exactly.
     -->
     <StandardDirectory Id="LocalAppDataFolder">
       <Directory Id="ProgramsFolder" Name="Programs">
@@ -50,17 +39,12 @@
       <ComponentRef Id="PathEntry" />
     </Feature>
 
-    <!-- Only qbit.exe is installed. No qbit-cli.exe, no aliases. (Requirement 3.3) -->
+    <!-- The actual binary. Only qbit.exe — no qbit-cli.exe alias. -->
     <Component Id="QbitExecutable" Directory="BINFOLDER" Guid="*">
       <File Id="QbitExe" Source="$(var.QbitBinaryPath)" Name="qbit.exe" KeyPath="yes" />
     </Component>
 
-    <!--
-      Adds bin dir to User PATH (Requirement 3.4). The registry KeyPath
-      here also acts as the marker cleaned up on uninstall (Requirement
-      3.5 - registry marker removal) — WiX removes this key automatically
-      when the component is uninstalled, no custom action needed.
-    -->
+    <!-- Add bin dir to the user's PATH, once, without duplicating -->
     <Component Id="PathEntry" Directory="BINFOLDER" Guid="*">
       <RegistryValue
           Root="HKCU"
@@ -82,14 +66,6 @@
     <Icon Id="QbitIcon.ico" SourceFile="$(var.IconPath)" />
     <Property Id="ARPPRODUCTICON" Value="QbitIcon.ico" />
     <Property Id="ARPNOMODIFY" Value="1" />
-
-    <!--
-      Requirement 3.10: correct name/icon in Installed Apps — ARPPRODUCTICON
-      above plus Package/Name="Qbit CLI" satisfies this.
-      Requirement 3.11: silent install/uninstall — supported natively by
-      msiexec /i ... /qn and /x ... /qn; no custom UI sequence is defined
-      here that would block silent mode.
-    -->
 
   </Package>
 </Wix>
