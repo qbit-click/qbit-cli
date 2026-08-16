@@ -68,26 +68,68 @@ install:
 
 ## Installers & PATH integration
 
-Every release ships with platform-specific setup archives:
+Each release publishes native, OS-standard installers — no archives to extract.
 
-| Platform | Asset | Inside the archive |
-|----------|-------|--------------------|
-| Windows  | `qbit-windows-setup.zip` | `qbit-cli.exe`, `install.ps1`, `uninstall.ps1`, icon |
-| macOS    | `qbit-macos-setup.tar.gz` | `qbit-cli`, `install_macos.sh`, `uninstall_macos.sh`, icon |
-| Linux    | `qbit-linux-setup.tar.gz` | `qbit-cli`, `install.sh`, `uninstall.sh`, optional GPG signature |
+| Platform | Asset | Installer type |
+|----------|-------|-----------------|
+| Windows  | `qbit-cli-<version>-windows-<arch>.msi` | MSI, per-user |
+| macOS    | `qbit-cli-<version>-macos-<arch>.pkg` | PKG |
+| Linux    | `qbit-cli_<version>_<arch>.deb` | DEB |
 
-Usage example on Linux/macOS:
+Every asset ships alongside a matching `<asset>.sha256` checksum file.
+
+### Install
+
+**Linux (DEB):**
 ```bash
-tar -xzf qbit-linux-setup.tar.gz
-sudo ./install.sh
+sudo dpkg -i qbit-cli_<version>_amd64.deb
 qbit --help
 ```
-On Windows, extract the archive and run `install.ps1`. By default it installs per-user under `%LOCALAPPDATA%\Qbit\bin` and updates the user PATH (no admin required). For machine-wide install, run with elevation and `-Scope Machine`. Use `uninstall.ps1` to remove the binary and PATH entry.
+
+**macOS (PKG):**
+```bash
+sudo installer -pkg qbit-cli-<version>-macos-<arch>.pkg -target /
+qbit --help
+```
+Installs to `/usr/local/bin/qbit`.
+
+**Windows (MSI):**
+Double-click the `.msi`, or install silently:
+```powershell
+msiexec /i qbit-cli-<version>-windows-<arch>.msi /qn
+```
+Installs per-user to `%LOCALAPPDATA%\Programs\Qbit CLI\bin\qbit.exe` and adds that folder to your user `PATH` automatically — no administrator privileges required. Open a new terminal and run `qbit --help`.
+
+### Uninstall
+
+- **Linux:** `sudo dpkg -r qbit-cli`
+- **macOS:** uninstall via the payload path, or see `TESTING.md` for the documented removal procedure
+- **Windows:** remove via *Settings → Apps → Installed apps*, or `msiexec /x <path-to-msi> /qn`
+
+### Upgrading
+
+```bash
+qbit upgrade
+```
+Reads the latest official GitHub release, downloads the correct installer for your OS/architecture, verifies its SHA-256 checksum, and installs it using your OS's native installer (`dpkg`, `installer`, or `msiexec`). If elevated privileges are required, you'll be prompted automatically.
+
+### Automatic update checks
+
+`qbit` checks for a newer version at most once every 24 hours, before running your command. The check:
+- has a short timeout and never blocks or fails your command if it can't reach GitHub
+- only ever prints to **stderr** (never stdout), so it never interferes with scripts parsing `qbit`'s output
+- looks like: `A new version of qbit is available: v1.2.3 (run \`qbit upgrade\` to install it)`
+
+Disable the automatic check with:
+```bash
+CHECK_UPDATE_DISABLE_QBIT=1 qbit <command>
+```
+This only disables the automatic background check — running `qbit upgrade` yourself always works regardless of this setting.
 
 ## Supported Commands
 
 - `qbit install <name[:version]> [--yes] [--dry-run]` – Install operating-system dependencies via detected package managers (`QBIT_PACKAGE_MANAGER` can force one).
-- `qbit upgrade` – Check the latest GitHub release and install it when a newer version is available.
+- `qbit upgrade` – Download, checksum-verify, and install the latest official GitHub release for your platform.
 - `qbit run <script>` – Execute custom workflows defined in configuration.
 - `qbit py <init|add|remove>` – Python virtualenv management with automatic `requirements.txt` updates.
 - `qbit js <init|add|remove|run>` – JavaScript project scaffolding, npm/yarn/pnpm/bun integration, and script execution.
