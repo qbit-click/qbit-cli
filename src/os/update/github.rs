@@ -34,11 +34,7 @@ pub enum CheckOutcome {
 /// Abstraction over the HTTP call so tests can inject a fake
 /// implementation instead of hitting api.github.com.
 pub trait GithubClient {
-    fn get_latest_release(
-        &self,
-        repository: &str,
-        etag: Option<&str>,
-    ) -> Result<CheckOutcome>;
+    fn get_latest_release(&self, repository: &str, etag: Option<&str>) -> Result<CheckOutcome>;
 }
 
 /// Real implementation using `reqwest::blocking`, with a short timeout
@@ -58,11 +54,7 @@ impl RealGithubClient {
 }
 
 impl GithubClient for RealGithubClient {
-    fn get_latest_release(
-        &self,
-        repository: &str,
-        etag: Option<&str>,
-    ) -> Result<CheckOutcome> {
+    fn get_latest_release(&self, repository: &str, etag: Option<&str>) -> Result<CheckOutcome> {
         let url = format!("https://api.github.com/repos/{repository}/releases/latest");
 
         let mut request = self
@@ -89,7 +81,10 @@ impl GithubClient for RealGithubClient {
         if response.status() == reqwest::StatusCode::FORBIDDEN
             || response.status() == reqwest::StatusCode::TOO_MANY_REQUESTS
         {
-            anyhow::bail!("GitHub API rate limit reached (status {})", response.status());
+            anyhow::bail!(
+                "GitHub API rate limit reached (status {})",
+                response.status()
+            );
         }
 
         let response = response
@@ -164,7 +159,9 @@ mod tests {
             etag: Some("\"xyz\"".to_string()),
         }));
 
-        let outcome = client.get_latest_release("qbit-click/qbit-cli", None).unwrap();
+        let outcome = client
+            .get_latest_release("qbit-click/qbit-cli", None)
+            .unwrap();
         match outcome {
             CheckOutcome::Fresh { release, etag } => {
                 assert_eq!(release.tag_name, "v1.2.3");
@@ -187,9 +184,6 @@ mod tests {
     fn etag_is_forwarded_to_client() {
         let client = FakeGithubClient::returning(Ok(CheckOutcome::NotModified));
         let _ = client.get_latest_release("qbit-click/qbit-cli", Some("\"abc\""));
-        assert_eq!(
-            client.last_etag_sent.borrow().as_deref(),
-            Some("\"abc\"")
-        );
+        assert_eq!(client.last_etag_sent.borrow().as_deref(), Some("\"abc\""));
     }
 }

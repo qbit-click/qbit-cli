@@ -78,7 +78,11 @@ pub fn select_asset<'a>(platform: Platform, asset_names: &[&'a str]) -> Result<&
     match matches.as_slice() {
         [] => bail!(
             "No installer asset found for this platform (prefix `{prefix}`, marker `{marker}`, extension `{ext}`). Available: {}",
-            if asset_names.is_empty() { "<none>".to_string() } else { asset_names.join(", ") }
+            if asset_names.is_empty() {
+                "<none>".to_string()
+            } else {
+                asset_names.join(", ")
+            }
         ),
         [single] => Ok(single),
         multiple => bail!(
@@ -128,10 +132,7 @@ mod tests {
         // Two Linux .deb candidates for different arches — this
         // module has no arch info, so both would match Linux's
         // pattern and it must fail closed rather than pick one.
-        let assets = vec![
-            "qbit-cli_1.2.3_amd64.deb",
-            "qbit-cli_1.2.3_arm64.deb",
-        ];
+        let assets = vec!["qbit-cli_1.2.3_amd64.deb", "qbit-cli_1.2.3_arm64.deb"];
         let err = select_asset(Platform::Linux, &assets).unwrap_err();
         assert!(err.to_string().contains("Ambiguous"));
     }

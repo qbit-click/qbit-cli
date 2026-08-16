@@ -409,8 +409,7 @@ mod tests {
         let release = sample_release();
         let current_platform = Platform::current().expect("platform");
         let asset_names: Vec<&str> = release.assets.iter().map(|a| a.name.as_str()).collect();
-        let asset_name =
-            platform::select_asset(current_platform, &asset_names).expect("asset");
+        let asset_name = platform::select_asset(current_platform, &asset_names).expect("asset");
         assert!(asset_name.ends_with(current_platform.installer_extension()));
         assert!(!asset_name.ends_with(".sha256"));
     }
@@ -420,8 +419,7 @@ mod tests {
         let release = sample_release();
         let current_platform = Platform::current().expect("platform");
         let asset_names: Vec<&str> = release.assets.iter().map(|a| a.name.as_str()).collect();
-        let asset_name =
-            platform::select_asset(current_platform, &asset_names).expect("asset");
+        let asset_name = platform::select_asset(current_platform, &asset_names).expect("asset");
         let checksum = find_checksum_asset(&release, asset_name).expect("checksum");
         assert_eq!(checksum.name, format!("{asset_name}.sha256"));
     }
@@ -432,8 +430,7 @@ mod tests {
         release.assets.retain(|a| !a.name.ends_with(".sha256"));
         let current_platform = Platform::current().expect("platform");
         let asset_names: Vec<&str> = release.assets.iter().map(|a| a.name.as_str()).collect();
-        let asset_name =
-            platform::select_asset(current_platform, &asset_names).expect("asset");
+        let asset_name = platform::select_asset(current_platform, &asset_names).expect("asset");
         let err = find_checksum_asset(&release, asset_name).expect_err("must fail");
         assert!(err.to_string().contains("Checksum file"));
     }

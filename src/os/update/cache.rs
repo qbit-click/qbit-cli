@@ -49,15 +49,11 @@ impl UpdateCache {
         let parent = path.parent().unwrap_or_else(|| Path::new("."));
         fs::create_dir_all(parent)?;
 
-        let tmp_path = parent.join(format!(
-            ".update-check.{}.tmp",
-            std::process::id()
-        ));
+        let tmp_path = parent.join(format!(".update-check.{}.tmp", std::process::id()));
 
         {
             let mut tmp_file = fs::File::create(&tmp_path)?;
-            let json = serde_json::to_string_pretty(self)
-                .unwrap_or_else(|_| "{}".to_string());
+            let json = serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".to_string());
             tmp_file.write_all(json.as_bytes())?;
             tmp_file.sync_all()?;
         }

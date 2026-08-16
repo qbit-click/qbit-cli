@@ -31,7 +31,11 @@ fn now_unix() -> u64 {
         .as_secs()
 }
 
-fn write_cache(cache_dir: &std::path::Path, last_checked_unix: u64, latest_seen_version: Option<&str>) {
+fn write_cache(
+    cache_dir: &std::path::Path,
+    last_checked_unix: u64,
+    latest_seen_version: Option<&str>,
+) {
     fs::create_dir_all(cache_dir).expect("create cache dir");
     let cache_file = cache_dir.join("update-check.json");
     let version_json = match latest_seen_version {
@@ -79,7 +83,10 @@ fn disable_env_var_does_not_disable_manual_upgrade_command() {
     let assert = Command::cargo_bin("qbit")
         .expect("qbit binary")
         .env("CHECK_UPDATE_DISABLE_QBIT", "1")
-        .env("QBIT_UPGRADE_REPO", "qbit-click/this-repo-does-not-exist-12345")
+        .env(
+            "QBIT_UPGRADE_REPO",
+            "qbit-click/this-repo-does-not-exist-12345",
+        )
         .arg("upgrade")
         .assert();
 
