@@ -24,24 +24,22 @@ fn main() {
 /// swallowed here rather than propagated. The only visible side
 /// effect when a newer version is available is a single line to
 /// stderr, so it can never pollute machine-readable stdout output.
+///
+/// If a check fails, the failure reason is only surfaced when
+/// `QBIT_UPDATE_DEBUG=1` is set — by default it stays fully silent.
 fn run_update_check_best_effort() {
     use os::update::CheckResult;
 
-    match os::update::check_if_due() {
-        CheckResult::UpdateAvailable { latest } => {
-            eprintln!(
-                "A new version of qbit is available: {latest} (run `qbit upgrade` to install it)"
-            );
-        }
-        CheckResult::NotDue
-        | CheckResult::Disabled
-        | CheckResult::UpToDate
-        | CheckResult::CheckFailed(_) => {
-            // Deliberately silent: not due, disabled via
-            // CHECK_UPDATE_DISABLE_QBIT=1, already up to date, or the
-            // check itself failed (network/rate-limit/cache error).
-            // None of these should ever reach stdout, and none of
-            // them should block or fail the main command.
-        }
+    let result = os::update::check_if_due();
+    result.log_failure_if_debug_enabled();
+
+    if let CheckResult::UpdateAvailable { latest } = result {
+        eprintln!(
+            "A new version of qbit is available: {latest} (run `qbit upgrade` to install it)"
+        );
     }
+    // NotDue, Disabled, UpToDate, and CheckFailed (without debug
+    // logging) are all deliberately silent: none of them should ever
+    // reach stdout, and none of them should block or fail the main
+    // command.
 }

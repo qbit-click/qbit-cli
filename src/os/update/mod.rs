@@ -18,6 +18,7 @@ use github::{CheckOutcome, GithubClient, RealGithubClient};
 
 const DEFAULT_REPOSITORY: &str = "qbit-click/qbit-cli";
 const DISABLE_ENV_VAR: &str = "CHECK_UPDATE_DISABLE_QBIT";
+const DEBUG_ENV_VAR: &str = "QBIT_UPDATE_DEBUG";
 
 /// Result of a check attempt, for the caller to decide what (if
 /// anything) to print. All variants are non-fatal by design — this
@@ -33,11 +34,26 @@ pub enum CheckResult {
     /// Checked successfully; already up to date.
     UpToDate,
     /// The check itself failed (network error, parse error, rate
-    /// limit, etc). Contains a message for stderr-only display. This
-    /// must NEVER propagate as a hard error to the caller — it is
-    /// always something to silently continue past, optionally logging
-    /// to stderr.
+    /// limit, etc). The message is never shown by default (the check
+    /// must stay silent on failure), but is surfaced to stderr when
+    /// `QBIT_UPDATE_DEBUG=1` is set, so failures are diagnosable
+    /// without ever being visible to a normal user by default.
     CheckFailed(String),
+}
+
+impl CheckResult {
+    /// Logs a `CheckFailed` message to stderr, but only when
+    /// `QBIT_UPDATE_DEBUG=1` is set. For every other variant, and
+    /// when debug logging isn't enabled, this does nothing — callers
+    /// can call this unconditionally without needing to match on the
+    /// variant themselves.
+    pub fn log_failure_if_debug_enabled(&self) {
+        if let CheckResult::CheckFailed(message) = self {
+            if std::env::var(DEBUG_ENV_VAR).as_deref() == Ok("1") {
+                eprintln!("qbit update check failed (QBIT_UPDATE_DEBUG=1): {message}");
+            }
+        }
+    }
 }
 
 /// The single entry point `main.rs` should call before normal command
@@ -89,14 +105,11 @@ pub fn check_with_client(
 
     match outcome {
         CheckOutcome::NotModified => {
-            // Nothing changed since last check, but we did successfully
-            // check — refresh the timestamp so we don't check again for
-            // another 24h, while keeping the same cached version/etag.
             let refreshed = UpdateCache {
                 last_checked_unix: now,
                 ..existing.clone()
             };
-            let _ = refreshed.save(cache_path); // best-effort; ignore failure
+            let _ = refreshed.save(cache_path);
 
             match &existing.latest_seen_version {
                 Some(v) if is_newer(v, current_version_str()) => {
@@ -111,7 +124,7 @@ pub fn check_with_client(
                 latest_seen_version: Some(release.tag_name.clone()),
                 etag,
             };
-            let _ = refreshed.save(cache_path); // best-effort; ignore failure
+            let _ = refreshed.save(cache_path);
 
             if is_newer(&release.tag_name, current_version_str()) {
                 CheckResult::UpdateAvailable {
@@ -186,9 +199,6 @@ mod tests {
 
     #[test]
     fn disabled_env_var_short_circuits() {
-        // SAFETY: this test sets/removes only the specific env var
-        // under test, and does not run concurrently with other tests
-        // that read or write the same variable.
         unsafe {
             std::env::set_var(DISABLE_ENV_VAR, "1");
         }
@@ -254,5 +264,24 @@ mod tests {
             CheckResult::CheckFailed(msg) => assert!(msg.contains("simulated network error")),
             _ => panic!("expected CheckFailed"),
         }
+    }
+
+    #[test]
+    fn check_failed_message_is_actually_read_by_log_helper() {
+        // Confirms the String field on CheckFailed is genuinely used
+        // (not dead code): the debug-log helper reads it when the
+        // debug env var is set.
+        unsafe {
+            std::env::set_var(DEBUG_ENV_VAR, "1");
+        }
+        let result = CheckResult::CheckFailed("boom".to_string());
+        result.log_failure_if_debug_enabled();
+        unsafe {
+            std::env::remove_var(DEBUG_ENV_VAR);
+        }
+        // No panic and no assertion on stderr content here (capturing
+        // stderr reliably across test runners is out of scope) — this
+        // test's purpose is to prove the field is read, which the
+        // compiler itself now verifies (no more dead-code warning).
     }
 }

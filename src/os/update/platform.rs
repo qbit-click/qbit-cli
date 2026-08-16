@@ -5,7 +5,16 @@
 
 use anyhow::{Result, bail};
 
+// Only one variant is ever actually constructed on a given build,
+// since `current()` is #[cfg]-gated per target_os — the other two
+// variants exist so this type is meaningful across all supported
+// platforms in shared (non-cfg-gated) code like `asset_pattern` and
+// the unit tests below, which construct every variant explicitly to
+// test the matching logic regardless of the host OS running the
+// tests. clippy's dead-code lint can't see that cross-platform intent
+// from a single-target build, hence the explicit allow.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum Platform {
     Windows,
     MacOs,
@@ -16,15 +25,15 @@ impl Platform {
     pub fn current() -> Result<Platform> {
         #[cfg(target_os = "windows")]
         {
-            return Ok(Platform::Windows);
+            Ok(Platform::Windows)
         }
         #[cfg(target_os = "macos")]
         {
-            return Ok(Platform::MacOs);
+            Ok(Platform::MacOs)
         }
         #[cfg(target_os = "linux")]
         {
-            return Ok(Platform::Linux);
+            Ok(Platform::Linux)
         }
         #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
         {
@@ -121,6 +130,17 @@ mod tests {
     }
 
     #[test]
+    fn select_asset_finds_unique_macos_match() {
+        let assets = vec![
+            "qbit-cli_1.2.3_amd64.deb",
+            "qbit-cli-1.2.3-macos-arm64.pkg",
+            "qbit-cli-1.2.3-macos-arm64.pkg.sha256",
+        ];
+        let found = select_asset(Platform::MacOs, &assets).unwrap();
+        assert_eq!(found, "qbit-cli-1.2.3-macos-arm64.pkg");
+    }
+
+    #[test]
     fn select_asset_errors_when_none_match() {
         let assets = vec!["some-other-tool-1.0.0.tar.gz"];
         let err = select_asset(Platform::Linux, &assets).unwrap_err();
@@ -129,9 +149,6 @@ mod tests {
 
     #[test]
     fn select_asset_errors_on_ambiguous_match() {
-        // Two Linux .deb candidates for different arches — this
-        // module has no arch info, so both would match Linux's
-        // pattern and it must fail closed rather than pick one.
         let assets = vec!["qbit-cli_1.2.3_amd64.deb", "qbit-cli_1.2.3_arm64.deb"];
         let err = select_asset(Platform::Linux, &assets).unwrap_err();
         assert!(err.to_string().contains("Ambiguous"));
