@@ -1,13 +1,13 @@
 {
     "schemaVersion":  "1.0",
     "installerId":  "installer.ai-context",
-    "installerVersion":  "1.0.2",
+    "installerVersion":  "1.1.0",
     "mode":  "member",
     "projectId":  "qbit",
     "repositoryId":  "qbit-cli",
     "contextRemote":  "https://github.com/qbit-click/qbit-ai-context.git",
     "contextBranch":  "main",
-    "installedAtUtc":  "2026-08-24T09:15:35Z",
+    "installedAtUtc":  "2026-08-24T11:35:20Z",
     "managedFiles":  [
                          {
                              "path":  ".ai/context/.gitignore",
@@ -19,7 +19,15 @@
                          },
                          {
                              "path":  ".ai/context/context.ps1",
-                             "sha256":  "d67b72663b007042bbacd5b1f3e2c34b2b3a5b0cbaaddbd6a91ed0978e6680dd"
+                             "sha256":  "e9788ee98f9695ab49c3f8f024f2698d0ea97a34601b74ca9c58f3765b855f2e"
+                         },
+                         {
+                             "path":  ".ai/context/context.py",
+                             "sha256":  "28fd9e5050780df9c4a8a5cc31faf945fef62f9783acd19ce728ed87ec6f9800"
+                         },
+                         {
+                             "path":  ".ai/context/context.sh",
+                             "sha256":  "6138e0013de4d2c538240348891507a4927bcdbaf71b7da04116ca9a344b9e67"
                          }
                      ],
     "managedBlocks":  [
@@ -39,13 +47,13 @@
                               "path":  "AGENTS.md",
                               "begin":  "\u003c!-- qbit-toolkit:ai-context:start --\u003e",
                               "end":  "\u003c!-- qbit-toolkit:ai-context:end --\u003e",
-                              "sha256":  "3674578b00715be47dec983acff6b1ca4393d169e2bf115a43c969e0089412a9"
+                              "sha256":  "6153dc241b1b6ba8784df60267c3ca989a0d3b372eb7421fc698ca686030d095"
                           },
                           {
                               "path":  "AI_CONTEXT.md",
                               "begin":  "\u003c!-- qbit-toolkit:ai-context:start --\u003e",
                               "end":  "\u003c!-- qbit-toolkit:ai-context:end --\u003e",
-                              "sha256":  "f93f8a9e7a93229893dd9ae8c8d893eab2dab004e083f5a5ce30adb46ee1f5a6"
+                              "sha256":  "a8f295e31198828f2b70a3dfcbaac7b6f4e897d67b3dee1e5601ebda2abc6d8c"
                           }
                       ],
     "seededFiles":  [
