@@ -64,6 +64,7 @@ Before selecting an AI capability, classify the request as ordinary repository w
 - Follow `.ai/policies/tool-boundaries.md` for trust, mutation, network, and evidence boundaries.
 <!-- qbit-toolkit:codex-ai-tooling:end -->
 
+<!-- qbit-toolkit:ai-context:start -->
 ## AI context lifecycle
 
 - Before the first substantive repository analysis, planning, or implementation in a Codex session, automatically run `powershell -NoProfile -ExecutionPolicy Bypass -File .ai/context/context.ps1 start`. Do not ask the developer and do not wait for a context-loading instruction.
@@ -76,4 +77,5 @@ Before selecting an AI capability, classify the request as ordinary repository w
 - Promote durable technical decisions into their canonical owning repository/ADR/contract; the context checkpoint records continuity, not technical authority.
 - Never store secrets, credentials, cookies, tokens, private keys, `.env` values, customer secrets, or raw chat transcripts in AI context.
 - If context start/checkpoint fails because of missing context source, authentication, dirty/diverged context state, or a concurrent conflict, do not perform destructive recovery; report the condition and preserve data.
-- `.ai-bridge/` and `.ai/context/cache/` are transient/ignored runtime locations. Serena and Graphify remain derived evidence tools, not project memory.
+- `.ai-bridge/` and `.ai/context/cache/` are transient/ignored runtime locations. Semantic indexes and graph outputs remain derived evidence tools, not project memory.
+<!-- qbit-toolkit:ai-context:end -->

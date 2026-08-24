@@ -16,3 +16,8 @@ test-results/
 .qbit-toolkit/codex-ai-tooling/backups/
 .qbit-toolkit/codex-ai-tooling/transactions/
 # qbit-toolkit:codex-ai-tooling:end
+
+# qbit-toolkit:ai-context:start
+.qbit-toolkit/ai-context/backups/
+.qbit-toolkit/ai-context/transactions/
+# qbit-toolkit:ai-context:end
