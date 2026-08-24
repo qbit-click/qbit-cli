@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0",
   "installerId": "installer.codex-ai-tooling",
-  "installerVersion": "1.1.1",
+  "installerVersion": "1.1.2",
   "toolkitSchemaVersion": "1.0",
   "profile": "rust",
   "projectSlug": "qbit-cli",
@@ -109,7 +109,7 @@
     ".codex/config.toml": "0a66bcb5ce3881e644eeb78a45de00b9fedde67a291f41848bf8fddb7006b100",
     ".env.ai.example": "d873fa042a35fda8c96fb0828cc7759fbf462b2509be2401935e497718a14b55",
     ".graphifyignore": "e487071681f9bb390d4795e863407af52da53ef04b54cc4fddb11f1f3144eaf5",
-    ".qbit-toolkit/codex-ai-tooling/manifest.json": "bacf34c5117e1eb305e22c0417cd7312ea2390ffc4edaea167bada81596686bd",
+    ".qbit-toolkit/codex-ai-tooling/manifest.json": "fe9eabf51f313230e9afea4ee5f1ff0f7ed552e17e644d2ed97e887d5c6a030c",
     ".serena/.gitignore": "a4c19f6044a78473b0e94b1cfcd09e38bcb611abf3f4608086b6886e288c3f47",
     ".serena/codex-single-project.yml": "c1101c64316dc99dc9e423e2b6e97647ef53b487d267ee0473662fd0e732685a",
     ".serena/project.yml": "158fa4797f0fa6dff5f604a0af63bd294e19ade6d36c4e222a1123c34a938f8e",
