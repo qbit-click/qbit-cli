@@ -1,13 +1,13 @@
 {
     "schemaVersion":  "1.0",
     "installerId":  "installer.ai-context",
-    "installerVersion":  "1.2.1",
+    "installerVersion":  "1.2.2",
     "mode":  "member",
     "projectId":  "qbit",
     "repositoryId":  "qbit-cli",
     "contextRemote":  "https://github.com/qbit-click/qbit-ai-context.git",
     "contextBranch":  "main",
-    "installedAtUtc":  "2026-08-26T12:37:09Z",
+    "installedAtUtc":  "2026-08-26T19:40:42Z",
     "managedFiles":  [
                          {
                              "path":  ".ai/context/.gitignore",
@@ -51,7 +51,7 @@
                               "path":  "AGENTS.md",
                               "begin":  "\u003c!-- qbit-toolkit:ai-context:start --\u003e",
                               "end":  "\u003c!-- qbit-toolkit:ai-context:end --\u003e",
-                              "sha256":  "c7b5a0108749c4ee7a5c5c5f3bdb69185f66f6aae954a751ec78f65973a00e38"
+                              "sha256":  "e672c75e727f2bffef3de7e3b46b173635f553e72926d0de2bccd394056641e2"
                           },
                           {
                               "path":  "AI_CONTEXT.md",
