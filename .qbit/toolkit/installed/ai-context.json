@@ -1,13 +1,13 @@
 {
     "schemaVersion":  "1.0",
     "installerId":  "installer.ai-context",
-    "installerVersion":  "1.1.2",
+    "installerVersion":  "1.2.1",
     "mode":  "member",
     "projectId":  "qbit",
     "repositoryId":  "qbit-cli",
     "contextRemote":  "https://github.com/qbit-click/qbit-ai-context.git",
     "contextBranch":  "main",
-    "installedAtUtc":  "2026-08-24T12:53:53Z",
+    "installedAtUtc":  "2026-08-26T12:37:09Z",
     "managedFiles":  [
                          {
                              "path":  ".ai/context/.gitignore",
@@ -18,12 +18,16 @@
                              "sha256":  "489f9970dc84c6420145581f091b864c40a5c49e4427c995dbbbc96c4b2b5f27"
                          },
                          {
+                             "path":  ".ai/context/context-transfer.ps1",
+                             "sha256":  "87c63ba07ec341e357dc142bd5d1aaf87ae98f038b371e2cd1abaa669c411532"
+                         },
+                         {
                              "path":  ".ai/context/context.ps1",
-                             "sha256":  "e9788ee98f9695ab49c3f8f024f2698d0ea97a34601b74ca9c58f3765b855f2e"
+                             "sha256":  "8da46be804347bbb3c6f3d27f509d4b3279ef9c92bd7e8417e3c4a1e357fe27a"
                          },
                          {
                              "path":  ".ai/context/context.py",
-                             "sha256":  "28fd9e5050780df9c4a8a5cc31faf945fef62f9783acd19ce728ed87ec6f9800"
+                             "sha256":  "f6f311623c3a4ff57c98068dc8c503dd9755c1c8bd59b5b80eb0f5562fa807eb"
                          },
                          {
                              "path":  ".ai/context/context.sh",
@@ -47,7 +51,7 @@
                               "path":  "AGENTS.md",
                               "begin":  "\u003c!-- qbit-toolkit:ai-context:start --\u003e",
                               "end":  "\u003c!-- qbit-toolkit:ai-context:end --\u003e",
-                              "sha256":  "6153dc241b1b6ba8784df60267c3ca989a0d3b372eb7421fc698ca686030d095"
+                              "sha256":  "c7b5a0108749c4ee7a5c5c5f3bdb69185f66f6aae954a751ec78f65973a00e38"
                           },
                           {
                               "path":  "AI_CONTEXT.md",
