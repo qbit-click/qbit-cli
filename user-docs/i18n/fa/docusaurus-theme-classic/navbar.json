@@ -1,0 +1,26 @@
+{
+  "title": {
+    "message": "Qbit CLI",
+    "description": "The title in the navbar"
+  },
+  "logo.alt": {
+    "message": "Qbit CLI",
+    "description": "The alt text of navbar logo"
+  },
+  "item.label.دانلود": {
+    "message": "دانلود",
+    "description": "Navbar item with label دانلود"
+  },
+  "item.label.دستورها": {
+    "message": "دستورها",
+    "description": "Navbar item with label دستورها"
+  },
+  "item.label.پیکربندی": {
+    "message": "پیکربندی",
+    "description": "Navbar item with label پیکربندی"
+  },
+  "item.label.GitHub": {
+    "message": "GitHub",
+    "description": "Navbar item with label GitHub"
+  }
+}

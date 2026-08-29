@@ -1,12 +1,16 @@
 {
+  "extends": "@docusaurus/tsconfig",
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "strict": true,
     "types": ["node", "vitest/globals"],
-    "skipLibCheck": true,
-    "noEmit": true
+    "ignoreDeprecations": "6.0"
   },
-  "include": ["docs/.vitepress/**/*.ts", "tests/**/*.ts", "playwright.config.ts", "vitest.config.ts"]
+  "include": [
+    "docusaurus.config.ts",
+    "sidebars.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "tests/**/*.ts",
+    "playwright.config.ts",
+    "vitest.config.mts"
+  ]
 }

@@ -4,8 +4,9 @@
 .vscode/
 *.iml
 /user-docs/node_modules/
-/user-docs/docs/.vitepress/cache/
-/user-docs/docs/.vitepress/dist/
+/user-docs/.docusaurus/
+/user-docs/build/
+/user-docs/.bun-tmp/
 /user-docs/playwright-report/
 /user-docs/test-results/
 /user-docs/coverage/

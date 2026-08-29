@@ -17,7 +17,7 @@ Expected assets:
 If the binary's embedded version is already current, no installation is performed.
 
 ::: warning Current-release limitation
-Release `v0.1.3` was built with an embedded Cargo package version of `0.1.0`. As a result, `qbit upgrade` on that release can consider `v0.1.3` newer again. If you encounter this behavior, use the [direct latest-release download](/en/guide/download-install).
+Release `v0.1.3` was built with an embedded Cargo package version of `0.1.0`. As a result, `qbit upgrade` on that release can consider `v0.1.3` newer again. If you encounter this behavior, use the [direct latest-release download](/guide/download-install).
 :::
 
 `QBIT_UPGRADE_REPO=owner/repository` can override the repository for testing/custom distribution. Normal users should leave it unset.

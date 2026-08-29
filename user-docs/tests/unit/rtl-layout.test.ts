@@ -3,10 +3,10 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const stylesheet = readFileSync(
-  resolve(process.cwd(), "docs/.vitepress/theme/custom.css"),
-  "utf8",
-);
+const stylesheets = [
+  resolve(process.cwd(), "src/css/custom.css"),
+  resolve(process.cwd(), "src/pages/index.module.css"),
+].map((path) => readFileSync(path, "utf8")).join("\n");
 
 describe("RTL layout contract", () => {
   it("uses logical inline properties instead of physical horizontal spacing", () => {
@@ -18,17 +18,15 @@ describe("RTL layout contract", () => {
     ];
 
     for (const pattern of forbiddenPhysicalProperties) {
-      expect(stylesheet.match(pattern) ?? [], pattern.source).toEqual([]);
+      expect(stylesheets.match(pattern) ?? [], pattern.source).toEqual([]);
     }
   });
 
-  it("defines RTL overrides with logical start/end primitives", () => {
-    expect(stylesheet).toContain("padding-inline-start");
-    expect(stylesheet).toContain("padding-inline-end");
-    expect(stylesheet).toContain("margin-inline-start");
-    expect(stylesheet).toContain("margin-inline-end");
-    expect(stylesheet).toContain("inset-inline-start");
-    expect(stylesheet).toContain("inset-inline-end");
-    expect(stylesheet).toContain("border-inline-start");
+  it("keeps horizontal spacing direction-aware", () => {
+    expect(stylesheets).toContain("padding-inline");
+    expect(stylesheets).toContain("margin-inline");
+    expect(stylesheets).toContain("border-inline-start");
+    expect(stylesheets).toContain("border-inline-end");
+    expect(stylesheets).toContain("text-align: start");
   });
 });

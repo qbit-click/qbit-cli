@@ -29,4 +29,4 @@ Commands are executed in order and the workflow stops on failure.
 
 `qbit run <name>` executes Qbit project-config scripts. `qbit js run <script>` executes a `package.json` script through the selected JavaScript package manager.
 
-See [Qbit configuration](/en/guide/configuration) for the full config shape.
+See [Qbit configuration](/guide/configuration) for the full config shape.
