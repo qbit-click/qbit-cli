@@ -57,6 +57,9 @@ const config: Config = {
     ],
   ],
   themeConfig: {
+    metadata: [
+      {name: 'description', content: 'Qbit CLI documentation for installation, system packages, project scripts, Python, JavaScript, Dart, configuration, and upgrades.'},
+    ],
     navbar: {
       title: 'Qbit CLI',
       logo: {alt: 'Qbit CLI', src: 'icon.svg'},
@@ -69,7 +72,7 @@ const config: Config = {
       ],
     },
     footer: {
-      style: 'light',
+      style: 'dark',
       links: [
         {
           title: 'Qbit CLI',

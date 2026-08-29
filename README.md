@@ -10,6 +10,8 @@ The end-user guide, platform installation steps, command reference, configuratio
 
 Documentation source lives in `user-docs/` in this repository so command and release changes can be validated against the user guide in the same CI pipeline.
 
+The site is cloned from the canonical Qbit documentation template at `qbit-ai-toolkit/website`. `user-docs/template.source.json` pins the exact template revision and shared presentation hashes; only CLI content/routes/assets, Persian-as-default routing, the Pages base path, and repository-specific links are overridden.
+
 ## Why Qbit?
 
 - **Install anything with one command**

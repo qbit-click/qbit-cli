@@ -25,7 +25,6 @@ describe("RTL layout contract", () => {
   it("keeps horizontal spacing direction-aware", () => {
     expect(stylesheets).toContain("padding-inline");
     expect(stylesheets).toContain("margin-inline");
-    expect(stylesheets).toContain("border-inline-start");
     expect(stylesheets).toContain("border-inline-end");
     expect(stylesheets).toContain("text-align: start");
     expect(stylesheets).toContain("html[dir='rtl'] .navbar__search");

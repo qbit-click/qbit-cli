@@ -15,11 +15,11 @@ test("Persian home is RTL and exposes direct downloads", async ({ page }) => {
   });
   expect(searchDirection).toEqual({ direction: "rtl", textAlign: "right" });
 
-  const windowsLink = page.getByRole("link", { name: "qbit-windows-setup.zip" }).first();
-  await expect(windowsLink).toHaveAttribute(
-    "href",
-    "https://github.com/qbit-click/qbit-cli/releases/latest/download/qbit-windows-setup.zip",
+  const windowsLink = page.locator(
+    'a[href="https://github.com/qbit-click/qbit-cli/releases/latest/download/qbit-windows-setup.zip"]',
   );
+  await expect(windowsLink).toHaveCount(1);
+  await expect(page.getByRole("complementary", { name: "آخرین نسخه Qbit CLI" })).toBeVisible();
 
   const logoSpacing = await page.locator(".navbar__logo").evaluate((node) => {
     const style = getComputedStyle(node);

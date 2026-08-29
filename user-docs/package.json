@@ -6,14 +6,11 @@
   "scripts": {
     "start": "docusaurus start",
     "start:en": "docusaurus start --locale en",
-    "dev": "bun run start",
-    "dev:en": "bun run start:en",
     "preview": "docusaurus serve --build --host 127.0.0.1 --port 43176",
     "build": "docusaurus build",
     "serve": "docusaurus serve",
     "clear": "docusaurus clear",
     "typecheck": "tsc --noEmit",
-    "test": "bun run test:unit && bun run test:integration && bun run test:e2e",
     "test:unit": "vitest run tests/unit",
     "test:integration": "bun run build && vitest run tests/integration",
     "test:e2e": "playwright test",
@@ -22,6 +19,7 @@
   },
   "dependencies": {
     "@docusaurus/core": "3.10.2",
+    "@docusaurus/faster": "3.10.2",
     "@docusaurus/preset-classic": "3.10.2",
     "@easyops-cn/docusaurus-search-local": "0.55.3",
     "@fontsource-variable/vazirmatn": "5.3.0",
@@ -29,8 +27,7 @@
     "clsx": "^2.0.0",
     "prism-react-renderer": "^2.4.1",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "@docusaurus/faster": "3.10.2"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@docusaurus/module-type-aliases": "3.10.2",
