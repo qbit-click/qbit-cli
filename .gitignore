@@ -3,3 +3,9 @@
 .idea/
 .vscode/
 *.iml
+/user-docs/node_modules/
+/user-docs/docs/.vitepress/cache/
+/user-docs/docs/.vitepress/dist/
+/user-docs/playwright-report/
+/user-docs/test-results/
+/user-docs/coverage/

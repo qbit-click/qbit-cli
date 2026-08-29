@@ -37,3 +37,27 @@ jobs:
 
       - name: Build
         run: cargo build --release
+
+  docs:
+    name: user-docs
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: user-docs
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      - name: Install documentation dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: bunx playwright install --with-deps chromium
+
+      - name: Validate documentation
+        run: bun run check

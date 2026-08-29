@@ -29,6 +29,14 @@
 - Use descriptive test names (for example, `parses_basic_qbit_yaml`, `adds_python_dependency_to_requirements`).
 - New features should include tests for both the happy path and primary error cases; run `cargo test` before opening a PR.
 
+## User Documentation
+
+- Public end-user documentation lives under `user-docs/` and is deployed from this repository to GitHub Pages.
+- Persian is the default locale and English lives under `user-docs/docs/en/`; keep sidebar and page coverage in parity.
+- Ground command behavior in the current stable CLI source and tests. Keep download asset names aligned with `.github/workflows/release.yml` and `src/os/upgrade.rs`.
+- Documentation code/config changes require Unit, Integration, and Playwright E2E coverage under `user-docs/tests/`.
+- VitePress build output and local documentation dependencies are generated artifacts and must not be committed.
+
 ## Commit & Pull Request Guidelines
 
 - Use short, imperative commit messages (for example, `Add python init workflow`, `Refine os install error handling`).

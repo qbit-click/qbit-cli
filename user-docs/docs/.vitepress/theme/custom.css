@@ -1,0 +1,38 @@
+:root {
+  --vp-c-brand-1: #357da1;
+  --vp-c-brand-2: #2c6e90;
+  --vp-c-brand-3: #245f7d;
+  --vp-c-brand-soft: rgba(53, 125, 161, 0.14);
+  --vp-font-family-base: "Vazirmatn Variable", Inter, ui-sans-serif, system-ui, sans-serif;
+  --vp-font-family-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+html[lang="fa-IR"] body,
+html[lang="fa-IR"] .VPDoc,
+html[lang="fa-IR"] .VPNav,
+html[lang="fa-IR"] .VPSidebar {
+  text-align: right;
+}
+
+html[lang="fa-IR"] code,
+html[lang="fa-IR"] pre,
+html[lang="fa-IR"] table {
+  direction: ltr;
+  text-align: left;
+}
+
+.VPHero .name {
+  background: linear-gradient(135deg, #357da1 10%, #6750a4 90%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.VPFeature {
+  border-color: rgba(53, 125, 161, 0.2);
+  background: linear-gradient(145deg, rgba(53, 125, 161, 0.08), transparent 55%);
+}
+
+.download-table a {
+  font-weight: 700;
+}

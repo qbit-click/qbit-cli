@@ -2,6 +2,14 @@
 
 Qbit is a cross-platform developer command line that turns repetitive environment setup into a single command. Install system tools, bootstrap Python/JavaScript/Dart projects, and run your own scripts from one `qbit` binary that works on Windows, macOS, and Linux.
 
+## User documentation & download
+
+The end-user guide, platform installation steps, command reference, configuration examples, and direct latest-release download links are published at:
+
+- https://qbit-click.github.io/qbit-cli/
+
+Documentation source lives in `user-docs/` in this repository so command and release changes can be validated against the user guide in the same CI pipeline.
+
 ## Why Qbit?
 
 - **Install anything with one command**
