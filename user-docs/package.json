@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vitepress dev docs",
     "build": "vitepress build docs",
-    "preview": "vitepress preview docs --host 127.0.0.1 --port 43174",
+    "preview": "vitepress preview docs --host 127.0.0.1 --port 43176",
     "typecheck": "tsc --noEmit",
     "test": "bun run test:unit && bun run test:integration && bun run test:e2e",
     "test:unit": "vitest run tests/unit",
