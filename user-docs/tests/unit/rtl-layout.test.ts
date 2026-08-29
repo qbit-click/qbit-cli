@@ -28,5 +28,7 @@ describe("RTL layout contract", () => {
     expect(stylesheets).toContain("border-inline-start");
     expect(stylesheets).toContain("border-inline-end");
     expect(stylesheets).toContain("text-align: start");
+    expect(stylesheets).toContain("html[dir='rtl'] .navbar__search");
+    expect(stylesheets).toContain("direction: rtl");
   });
 });

@@ -9,6 +9,12 @@ test("Persian home is RTL and exposes direct downloads", async ({ page }) => {
   await expect(page.getByText("محیط توسعه و اتوماسیون، با یک دستور")).toBeVisible();
   await expect(page.locator(".navbar__search-input")).toBeVisible();
 
+  const searchDirection = await page.locator(".navbar__search-input").evaluate((node) => {
+    const style = getComputedStyle(node);
+    return { direction: style.direction, textAlign: style.textAlign };
+  });
+  expect(searchDirection).toEqual({ direction: "rtl", textAlign: "right" });
+
   const windowsLink = page.getByRole("link", { name: "qbit-windows-setup.zip" }).first();
   await expect(windowsLink).toHaveAttribute(
     "href",

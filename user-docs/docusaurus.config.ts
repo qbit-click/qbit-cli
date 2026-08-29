@@ -8,6 +8,11 @@ const config: Config = {
   title: 'Qbit CLI',
   tagline: 'محیط توسعه و اتوماسیون، با یک دستور',
   favicon: 'icon.svg',
+
+  future: {
+    v4: true,
+  },
+
   url: 'https://qbit-click.github.io',
   baseUrl,
   organizationName: 'qbit-click',

@@ -4,16 +4,21 @@
   "private": true,
   "packageManager": "bun@1.4.0",
   "scripts": {
-    "dev": "docusaurus start --host 127.0.0.1 --port 3000",
-    "dev:en": "docusaurus start --locale en --host 127.0.0.1 --port 3000",
-    "build": "docusaurus build",
+    "start": "docusaurus start",
+    "start:en": "docusaurus start --locale en",
+    "dev": "bun run start",
+    "dev:en": "bun run start:en",
     "preview": "docusaurus serve --build --host 127.0.0.1 --port 43176",
+    "build": "docusaurus build",
+    "serve": "docusaurus serve",
+    "clear": "docusaurus clear",
     "typecheck": "tsc --noEmit",
     "test": "bun run test:unit && bun run test:integration && bun run test:e2e",
     "test:unit": "vitest run tests/unit",
     "test:integration": "bun run build && vitest run tests/integration",
     "test:e2e": "playwright test",
-    "check": "bun run typecheck && bun run test:unit && bun run test:integration && bun run test:e2e"
+    "check": "bun run typecheck && bun run test:unit && bun run test:integration && bun run test:e2e",
+    "write-translations": "docusaurus write-translations"
   },
   "dependencies": {
     "@docusaurus/core": "3.10.2",
@@ -24,7 +29,8 @@
     "clsx": "^2.0.0",
     "prism-react-renderer": "^2.4.1",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "@docusaurus/faster": "3.10.2"
   },
   "devDependencies": {
     "@docusaurus/module-type-aliases": "3.10.2",
@@ -35,5 +41,8 @@
     "@types/react": "^19.0.0",
     "typescript": "~6.0.2",
     "vitest": "4.1.11"
+  },
+  "engines": {
+    "node": ">=20.0"
   }
 }

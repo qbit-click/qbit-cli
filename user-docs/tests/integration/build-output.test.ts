@@ -16,10 +16,10 @@ describe("Qbit CLI Docusaurus build", () => {
   it("renders Persian RTL and English LTR output", () => {
     const fa = read("index.html");
     const en = read("en/index.html");
-    expect(fa).toContain('lang="fa-IR"');
-    expect(fa).toContain('dir="rtl"');
-    expect(en).toContain('lang="en-US"');
-    expect(en).toContain('dir="ltr"');
+    expect(fa).toContain('lang=fa-IR');
+    expect(fa).toContain('dir=rtl');
+    expect(en).toContain('lang=en-US');
+    expect(en).toContain('dir=ltr');
   });
 
   it("renders direct latest-release download links", () => {
