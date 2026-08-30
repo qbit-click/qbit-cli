@@ -15,11 +15,11 @@ describe('Qbit AI Toolkit documentation template contract', () => {
   it('pins this site to the canonical AI Toolkit template revision', () => {
     expect(templateSource).toMatchObject({
       template: 'qbit-documentation',
-      templateVersion: '1.0.0',
+      templateVersion: '1.0.1',
       source: {
         repository: 'https://github.com/qbit-click/qbit-ai-toolkit.git',
         path: 'website',
-        revision: '71d2a438a10a32ac1058ae53dd523e852c3a29c0',
+        revision: '4b033caa1dafbfd6b6e5104512e98d3f95b8c3d5',
       },
     });
   });
