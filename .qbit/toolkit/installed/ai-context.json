@@ -1,13 +1,13 @@
 {
     "schemaVersion":  "1.0",
     "installerId":  "installer.ai-context",
-    "installerVersion":  "1.2.4",
+    "installerVersion":  "1.2.5",
     "mode":  "member",
     "projectId":  "qbit",
     "repositoryId":  "qbit-cli",
     "contextRemote":  "https://github.com/qbit-click/qbit-ai-context.git",
     "contextBranch":  "main",
-    "installedAtUtc":  "2026-08-30T17:10:00Z",
+    "installedAtUtc":  "2026-08-30T20:09:14Z",
     "managedFiles":  [
                          {
                              "path":  ".ai/context/.gitignore",
