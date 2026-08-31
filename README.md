@@ -6,7 +6,7 @@ Qbit is a cross-platform developer command line that turns repetitive environmen
 
 The end-user guide, platform installation steps, command reference, configuration examples, and direct latest-release download links are published at:
 
-- https://qbit-click.github.io/qbit-cli/
+- https://qbit-hub.github.io/qbit-cli/
 
 Documentation source lives in `user-docs/` in this repository so command and release changes can be validated against the user guide in the same CI pipeline.
 

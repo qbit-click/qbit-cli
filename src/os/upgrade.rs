@@ -12,7 +12,7 @@ use serde::Deserialize;
 use tar::Archive;
 use zip::ZipArchive;
 
-const DEFAULT_REPOSITORY: &str = "qbit-click/qbit-cli";
+const DEFAULT_REPOSITORY: &str = "qbit-hub/qbit-cli";
 
 #[derive(Debug, Deserialize)]
 struct GithubRelease {

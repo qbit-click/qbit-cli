@@ -30,7 +30,7 @@ const releaseAssets = {
 } as const;
 
 const latestDownloadUrl = (asset: string) =>
-  `https://github.com/qbit-click/qbit-cli/releases/latest/download/${asset}`;
+  `https://github.com/qbit-hub/qbit-cli/releases/latest/download/${asset}`;
 
 describe("Qbit CLI user documentation contracts", () => {
   it("keeps Persian and English guide coverage in parity and preserves routes", () => {

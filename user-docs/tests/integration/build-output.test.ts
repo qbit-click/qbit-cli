@@ -26,7 +26,7 @@ describe("Qbit CLI Docusaurus build", () => {
     const fa = read("guide/download-install.html");
     const en = read("en/guide/download-install.html");
     for (const asset of ["qbit-windows-setup.zip", "qbit-macos-setup.tar.gz", "qbit-linux-setup.tar.gz"]) {
-      const url = `https://github.com/qbit-click/qbit-cli/releases/latest/download/${asset}`;
+      const url = `https://github.com/qbit-hub/qbit-cli/releases/latest/download/${asset}`;
       expect(fa).toContain(url);
       expect(en).toContain(url);
     }

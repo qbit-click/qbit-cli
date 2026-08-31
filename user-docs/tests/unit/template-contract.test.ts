@@ -17,7 +17,7 @@ describe('Qbit AI Toolkit documentation template contract', () => {
       template: 'qbit-documentation',
       templateVersion: '1.0.1',
       source: {
-        repository: 'https://github.com/qbit-click/qbit-ai-toolkit.git',
+        repository: 'https://github.com/qbit-hub/qbit-ai-toolkit.git',
         path: 'website',
         revision: '4b033caa1dafbfd6b6e5104512e98d3f95b8c3d5',
       },

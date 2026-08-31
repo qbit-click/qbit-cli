@@ -6,7 +6,7 @@ Check the official GitHub repository for a newer release and install it with:
 qbit upgrade
 ```
 
-Qbit compares its build version with the latest `qbit-click/qbit-cli` release. When a newer version exists, it downloads the platform archive, extracts it, and runs that platform's installer.
+Qbit compares its build version with the latest `qbit-hub/qbit-cli` release. When a newer version exists, it downloads the platform archive, extracts it, and runs that platform's installer.
 
 Expected assets:
 

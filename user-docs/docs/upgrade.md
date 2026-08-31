@@ -6,7 +6,7 @@
 qbit upgrade
 ```
 
-Qbit نسخه فعلی باینری را با latest release repository رسمی `qbit-click/qbit-cli` مقایسه می‌کند. اگر نسخه جدیدتری وجود داشته باشد، asset مخصوص سیستم‌عامل را دانلود، extract و installer همان platform را اجرا می‌کند.
+Qbit نسخه فعلی باینری را با latest release repository رسمی `qbit-hub/qbit-cli` مقایسه می‌کند. اگر نسخه جدیدتری وجود داشته باشد، asset مخصوص سیستم‌عامل را دانلود، extract و installer همان platform را اجرا می‌کند.
 
 assetهای مورد انتظار:
 

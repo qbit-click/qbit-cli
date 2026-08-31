@@ -54,7 +54,7 @@ test('Persian home is RTL and exposes direct downloads', async ({page}) => {
   await expectTemplateChrome(page, 'rtl');
 
   const windowsLink = page.locator(
-    'a[href="https://github.com/qbit-click/qbit-cli/releases/latest/download/qbit-windows-setup.zip"]',
+    'a[href="https://github.com/qbit-hub/qbit-cli/releases/latest/download/qbit-windows-setup.zip"]',
   );
   await expect(windowsLink).toHaveCount(1);
   await expect(page.getByRole('complementary', {name: 'آخرین نسخه Qbit CLI'})).toBeVisible();

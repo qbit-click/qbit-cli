@@ -6,11 +6,11 @@ Qbit CLI ships platform-specific setup archives through GitHub Releases. These l
 
 | Platform | File |
 | --- | --- |
-| Windows | [qbit-windows-setup.zip](https://github.com/qbit-click/qbit-cli/releases/latest/download/qbit-windows-setup.zip) |
-| macOS | [qbit-macos-setup.tar.gz](https://github.com/qbit-click/qbit-cli/releases/latest/download/qbit-macos-setup.tar.gz) |
-| Linux | [qbit-linux-setup.tar.gz](https://github.com/qbit-click/qbit-cli/releases/latest/download/qbit-linux-setup.tar.gz) |
+| Windows | [qbit-windows-setup.zip](https://github.com/qbit-hub/qbit-cli/releases/latest/download/qbit-windows-setup.zip) |
+| macOS | [qbit-macos-setup.tar.gz](https://github.com/qbit-hub/qbit-cli/releases/latest/download/qbit-macos-setup.tar.gz) |
+| Linux | [qbit-linux-setup.tar.gz](https://github.com/qbit-hub/qbit-cli/releases/latest/download/qbit-linux-setup.tar.gz) |
 
-[Browse all releases](https://github.com/qbit-click/qbit-cli/releases)
+[Browse all releases](https://github.com/qbit-hub/qbit-cli/releases)
 
 ## Windows
 

@@ -6,11 +6,11 @@ Qbit CLI برای Windows، macOS و Linux به‌صورت setup archive در Gi
 
 | سیستم‌عامل | فایل |
 | --- | --- |
-| Windows | [qbit-windows-setup.zip](https://github.com/qbit-click/qbit-cli/releases/latest/download/qbit-windows-setup.zip) |
-| macOS | [qbit-macos-setup.tar.gz](https://github.com/qbit-click/qbit-cli/releases/latest/download/qbit-macos-setup.tar.gz) |
-| Linux | [qbit-linux-setup.tar.gz](https://github.com/qbit-click/qbit-cli/releases/latest/download/qbit-linux-setup.tar.gz) |
+| Windows | [qbit-windows-setup.zip](https://github.com/qbit-hub/qbit-cli/releases/latest/download/qbit-windows-setup.zip) |
+| macOS | [qbit-macos-setup.tar.gz](https://github.com/qbit-hub/qbit-cli/releases/latest/download/qbit-macos-setup.tar.gz) |
+| Linux | [qbit-linux-setup.tar.gz](https://github.com/qbit-hub/qbit-cli/releases/latest/download/qbit-linux-setup.tar.gz) |
 
-[مشاهده همه releaseها](https://github.com/qbit-click/qbit-cli/releases)
+[مشاهده همه releaseها](https://github.com/qbit-hub/qbit-cli/releases)
 
 ## Windows
 

@@ -13,9 +13,9 @@ const config: Config = {
     v4: true,
   },
 
-  url: 'https://qbit-click.github.io',
+  url: 'https://qbit-hub.github.io',
   baseUrl,
-  organizationName: 'qbit-click',
+  organizationName: 'qbit-hub',
   projectName: 'qbit-cli',
   trailingSlash: false,
   onBrokenLinks: 'throw',
@@ -34,7 +34,7 @@ const config: Config = {
         docs: {
           routeBasePath: 'guide',
           sidebarPath: './sidebars.ts',
-          editUrl: 'https://github.com/qbit-click/qbit-cli/edit/main/user-docs/docs/',
+          editUrl: 'https://github.com/qbit-hub/qbit-cli/edit/main/user-docs/docs/',
         },
         blog: false,
         theme: {customCss: './src/css/custom.css'},
@@ -68,7 +68,7 @@ const config: Config = {
         {to: '/guide/getting-started', label: 'دستورها', position: 'left'},
         {to: '/guide/configuration', label: 'پیکربندی', position: 'left'},
         {type: 'localeDropdown', position: 'right'},
-        {href: 'https://github.com/qbit-click/qbit-cli', label: 'GitHub', position: 'right'},
+        {href: 'https://github.com/qbit-hub/qbit-cli', label: 'GitHub', position: 'right'},
       ],
     },
     footer: {
@@ -85,8 +85,8 @@ const config: Config = {
         {
           title: 'Qbit',
           items: [
-            {label: 'GitHub', href: 'https://github.com/qbit-click/qbit-cli'},
-            {label: 'Qbit Console Docs', href: 'https://qbit-click.github.io/qbit-console-user-docs/'},
+            {label: 'GitHub', href: 'https://github.com/qbit-hub/qbit-cli'},
+            {label: 'Qbit Console Docs', href: 'https://qbit-hub.github.io/qbit-console-user-docs/'},
           ],
         },
       ],

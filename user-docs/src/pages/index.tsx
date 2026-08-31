@@ -33,7 +33,7 @@ type Copy = {
   closingCta: string;
 };
 
-const downloadBase = 'https://github.com/qbit-click/qbit-cli/releases/latest/download';
+const downloadBase = 'https://github.com/qbit-hub/qbit-cli/releases/latest/download';
 const downloads = [
   ['Windows', 'qbit-windows-setup.zip'],
   ['macOS', 'qbit-macos-setup.tar.gz'],
@@ -206,7 +206,7 @@ export default function Home(): ReactNode {
                   <Link className="button button--primary button--lg" to={localized('/guide/getting-started')}>
                     {text.primaryCta}
                   </Link>
-                  <Link className="button button--secondary button--lg" href="https://github.com/qbit-click/qbit-cli">
+                  <Link className="button button--secondary button--lg" href="https://github.com/qbit-hub/qbit-cli">
                     {text.githubCta}
                   </Link>
                 </div>
