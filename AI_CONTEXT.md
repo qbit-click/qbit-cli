@@ -11,7 +11,7 @@ Before substantive Codex work, the agent automatically runs the platform-appropr
 
 After a substantive validated milestone that changes durable continuity state, the agent creates `.ai-bridge/context-checkpoint.json` and runs the matching platform checkpoint launcher: `.ai/context/context.ps1 checkpoint` on Windows or `bash .ai/context/context.sh checkpoint` on Linux/macOS. Checkpoints are milestone-driven, not per-message.
 
-The canonical context source is `https://github.com/qbit-click/qbit-ai-context.git` on branch `main`.
+The canonical context source is `https://github.com/qbit-hub/qbit-ai-context.git` on branch `main`.
 
 ## Authority and safety
 
