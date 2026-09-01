@@ -2,6 +2,7 @@ import type {Config} from '@docusaurus/types';
 import type {Options, ThemeConfig} from '@docusaurus/preset-classic';
 import {themes as prismThemes} from 'prism-react-renderer';
 
+const url = process.env.DOCS_SITE_URL || 'https://qbit-hub.github.io';
 const baseUrl = process.env.DOCS_BASE_PATH || '/';
 
 const config: Config = {
@@ -13,7 +14,7 @@ const config: Config = {
     v4: true,
   },
 
-  url: 'https://qbit-hub.github.io',
+  url,
   baseUrl,
   organizationName: 'qbit-hub',
   projectName: 'qbit-cli',

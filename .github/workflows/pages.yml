@@ -40,9 +40,18 @@ jobs:
         id: pages
         uses: actions/configure-pages@v6
 
+      - name: Resolve GitHub Pages deployment URL
+        id: deployment
+        env:
+          PAGES_ORIGIN: ${{ steps.pages.outputs.origin }}
+          PAGES_BASE_URL: ${{ steps.pages.outputs.base_url }}
+          PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+        run: bun run scripts/resolve-pages-deployment.ts
+
       - name: Build documentation
         env:
-          DOCS_BASE_PATH: ${{ steps.pages.outputs.base_path }}/
+          DOCS_SITE_URL: ${{ steps.deployment.outputs.site_url }}
+          DOCS_BASE_PATH: ${{ steps.deployment.outputs.base_path }}
         run: bun run build
 
       - name: Upload Pages artifact
