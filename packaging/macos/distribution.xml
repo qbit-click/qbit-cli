@@ -6,18 +6,20 @@
     <options customize="never" require-scripts="false" rootVolumeOnly="true"/>
     <choices-outline>
         <line choice="default">
-            <line choice="com.qbit-click.qbit-cli.pkg"/>
+            <line choice="com.qbit-click.qbit-cli"/>
         </line>
     </choices-outline>
     <choice id="default"/>
-    <choice id="com.qbit-click.qbit-cli.pkg" visible="false">
-        <pkg-ref id="com.qbit-click.qbit-cli.pkg"/>
-    </choice>
     <!--
-      Requirement 4.1: this must remain a placeholder, never a
-      hardcoded version like "0.1.3". build-macos.sh substitutes the
-      real version at build time and verifies no placeholder survives
-      the render step.
+      Single, consistent identifier used everywhere: pkgbuild's
+      identifier flag, this choice id, this pkg-ref id, and CI's
+      pkgutil forget-package step all use exactly
+      "com.qbit-click.qbit-cli", with no ".pkg" suffix variant.
+      Keeping every reference identical avoids CI's uninstall step
+      silently failing to find the installed package receipt.
     -->
-    <pkg-ref id="com.qbit-click.qbit-cli.pkg" version="__VERSION__" onConclusion="none">component.pkg</pkg-ref>
+    <choice id="com.qbit-click.qbit-cli" visible="false">
+        <pkg-ref id="com.qbit-click.qbit-cli"/>
+    </choice>
+    <pkg-ref id="com.qbit-click.qbit-cli" version="__VERSION__" onConclusion="none">component.pkg</pkg-ref>
 </installer-gui-script>

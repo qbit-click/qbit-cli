@@ -2,7 +2,7 @@ use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
 use reqwest::blocking::Client;
@@ -13,6 +13,15 @@ use crate::os::update::checksum;
 use crate::os::update::platform::{self, Platform};
 
 const DEFAULT_REPOSITORY: &str = "qbit-click/qbit-cli";
+
+/// Manual `qbit upgrade` gets longer, bounded timeouts than the
+/// automatic background check (which uses a short 3s timeout so it
+/// never noticeably delays normal command startup). A manual upgrade
+/// is a deliberate, blocking action the user is actively waiting on,
+/// so it's reasonable to wait longer for a real result rather than
+/// failing fast — but it must still be bounded, never infinite.
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(120);
 
 #[derive(Debug, Deserialize)]
 struct GithubRelease {
@@ -52,6 +61,14 @@ impl Drop for TempDirGuard {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.path);
     }
+}
+
+fn http_client() -> Result<Client> {
+    Client::builder()
+        .connect_timeout(CONNECT_TIMEOUT)
+        .timeout(REQUEST_TIMEOUT)
+        .build()
+        .context("building HTTP client for upgrade")
 }
 
 pub fn upgrade() -> Result<()> {
@@ -123,9 +140,7 @@ fn github_api_url(repository: &str) -> String {
 }
 
 fn fetch_latest_release(repository: &str) -> Result<GithubRelease> {
-    let client = Client::builder()
-        .build()
-        .context("building HTTP client for upgrade")?;
+    let client = http_client()?;
 
     let response = client
         .get(github_api_url(repository))
@@ -173,9 +188,7 @@ fn list_asset_names(release: &GithubRelease) -> String {
 }
 
 fn download_to_file(url: &str, destination: &Path) -> Result<()> {
-    let client = Client::builder()
-        .build()
-        .context("building HTTP client for release download")?;
+    let client = http_client()?;
 
     let mut response = client
         .get(url)
@@ -196,9 +209,7 @@ fn download_to_file(url: &str, destination: &Path) -> Result<()> {
 }
 
 fn download_checksum_text(url: &str) -> Result<String> {
-    let client = Client::builder()
-        .build()
-        .context("building HTTP client for checksum download")?;
+    let client = http_client()?;
 
     client
         .get(url)
@@ -211,9 +222,8 @@ fn download_checksum_text(url: &str) -> Result<String> {
         .context("reading checksum response as text")
 }
 
-/// Runs the OS-native installer directly (no bundled install scripts,
-/// no archive extraction). If elevated privileges are required and we
-/// don't have them, re-invokes with an OS-appropriate elevation prompt.
+/// Runs the OS-native installer directly. No bundled install
+/// scripts, no archive extraction.
 fn run_native_installer(installer_path: &Path) -> Result<()> {
     #[cfg(target_os = "windows")]
     {
@@ -240,9 +250,6 @@ fn run_native_installer(installer_path: &Path) -> Result<()> {
 
 #[cfg(target_os = "windows")]
 fn run_msi_installer(installer_path: &Path) -> Result<()> {
-    // msiexec handles its own UAC elevation prompt for per-machine
-    // installs; for a per-user MSI (see QbitCli.wxs, Scope="perUser")
-    // no elevation is required at all, so we invoke it directly.
     let status = Command::new("msiexec")
         .arg("/i")
         .arg(installer_path)
@@ -254,38 +261,55 @@ fn run_msi_installer(installer_path: &Path) -> Result<()> {
         .status()
         .with_context(|| format!("running msiexec for {}", installer_path.display()))?;
 
-    if !status.success() {
-        bail!(
-            "msiexec failed (exit code {}) installing {}",
-            status.code().unwrap_or(1),
+    // Windows Installer success codes:
+    //   0    - success
+    //   3010 - success, but a reboot is required to finish
+    // Any other exit code is a real failure and must not be treated
+    // as success.
+    match status.code() {
+        Some(0) => Ok(()),
+        Some(3010) => {
+            println!(
+                "Upgrade installed successfully. A restart is required to complete the update (msiexec exit code 3010)."
+            );
+            Ok(())
+        }
+        Some(code) => bail!(
+            "msiexec failed (exit code {code}) installing {}",
             installer_path.display()
-        );
+        ),
+        None => bail!(
+            "msiexec was terminated by a signal while installing {}",
+            installer_path.display()
+        ),
     }
-    Ok(())
 }
 
 #[cfg(target_os = "macos")]
 fn run_pkg_installer(installer_path: &Path) -> Result<()> {
-    // `installer -pkg ... -target /` always requires root. Try
-    // directly first; if that fails due to permissions, re-invoke
-    // ourselves under `sudo`, which will prompt the user interactively.
-    let direct = Command::new("installer")
+    let output = Command::new("installer")
         .arg("-pkg")
         .arg(installer_path)
         .arg("-target")
         .arg("/")
-        .stdin(Stdio::inherit())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .status();
+        .output()
+        .with_context(|| format!("running installer for {}", installer_path.display()))?;
 
-    let needs_elevation = match &direct {
-        Ok(status) => !status.success(),
-        Err(_) => true,
-    };
-
-    if !needs_elevation {
+    if output.status.success() {
+        io::stdout().write_all(&output.stdout).ok();
         return Ok(());
+    }
+
+    let stderr_text = String::from_utf8_lossy(&output.stderr);
+    let stdout_text = String::from_utf8_lossy(&output.stdout);
+    let combined = format!("{stdout_text}{stderr_text}");
+
+    if !is_permission_denied(&combined) {
+        bail!(
+            "installer failed (exit code {}) installing {}:\n{combined}",
+            output.status.code().unwrap_or(1),
+            installer_path.display()
+        );
     }
 
     println!(
@@ -305,7 +329,7 @@ fn run_pkg_installer(installer_path: &Path) -> Result<()> {
 
     if !status.success() {
         bail!(
-            "installer failed (exit code {}) installing {}",
+            "installer failed (exit code {}) installing {} even with elevated privileges",
             status.code().unwrap_or(1),
             installer_path.display()
         );
@@ -315,24 +339,27 @@ fn run_pkg_installer(installer_path: &Path) -> Result<()> {
 
 #[cfg(target_os = "linux")]
 fn run_deb_installer(installer_path: &Path) -> Result<()> {
-    // `dpkg -i` requires root. Try directly first (covers containers
-    // and CI where the process may already be root); if that fails,
-    // re-invoke under `sudo`, which prompts the user interactively.
-    let direct = Command::new("dpkg")
+    let output = Command::new("dpkg")
         .arg("-i")
         .arg(installer_path)
-        .stdin(Stdio::inherit())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .status();
+        .output()
+        .with_context(|| format!("running dpkg for {}", installer_path.display()))?;
 
-    let needs_elevation = match &direct {
-        Ok(status) => !status.success(),
-        Err(_) => true,
-    };
-
-    if !needs_elevation {
+    if output.status.success() {
+        io::stdout().write_all(&output.stdout).ok();
         return Ok(());
+    }
+
+    let stderr_text = String::from_utf8_lossy(&output.stderr);
+    let stdout_text = String::from_utf8_lossy(&output.stdout);
+    let combined = format!("{stdout_text}{stderr_text}");
+
+    if !is_permission_denied(&combined) {
+        bail!(
+            "dpkg failed (exit code {}) installing {}:\n{combined}",
+            output.status.code().unwrap_or(1),
+            installer_path.display()
+        );
     }
 
     println!("Root privileges are required to install. You may be prompted for your password.");
@@ -348,12 +375,26 @@ fn run_deb_installer(installer_path: &Path) -> Result<()> {
 
     if !status.success() {
         bail!(
-            "dpkg failed (exit code {}) installing {}",
+            "dpkg failed (exit code {}) installing {} even with elevated privileges",
             status.code().unwrap_or(1),
             installer_path.display()
         );
     }
     Ok(())
+}
+
+/// Inspects installer output text for genuine permission/elevation
+/// signals, rather than assuming every nonzero exit means "needs
+/// sudo".
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+fn is_permission_denied(output: &str) -> bool {
+    let lower = output.to_lowercase();
+    lower.contains("permission denied")
+        || lower.contains("not permitted")
+        || lower.contains("requires root")
+        || lower.contains("must be run as root")
+        || lower.contains("you need to be root")
+        || lower.contains("operation not permitted")
 }
 
 #[cfg(test)]
@@ -437,9 +478,6 @@ mod tests {
 
     #[test]
     fn checksum_verification_round_trips_through_shared_module() {
-        // Confirms upgrade.rs is actually exercising the shared
-        // os::update::checksum module end-to-end (parse + verify),
-        // not a local duplicate of this logic.
         let dir = tempfile::tempdir().expect("tempdir");
         let file_path = dir.path().join("test.bin");
         std::fs::write(&file_path, b"hello world").expect("write");
@@ -452,5 +490,35 @@ mod tests {
 
         let parsed = checksum::parse_checksum_text(&checksum_file_text).expect("parse");
         checksum::verify_file(&file_path, &parsed).expect("checksum should match");
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[test]
+    fn is_permission_denied_recognizes_real_permission_errors() {
+        assert!(is_permission_denied("dpkg: error: permission denied"));
+        assert!(is_permission_denied(
+            "You need to be root to perform this operation"
+        ));
+        assert!(is_permission_denied(
+            "installer: This package requires root privileges"
+        ));
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[test]
+    fn is_permission_denied_rejects_unrelated_failures() {
+        assert!(!is_permission_denied(
+            "dpkg: error: package architecture (arm64) does not match system (amd64)"
+        ));
+        assert!(!is_permission_denied(
+            "dpkg: dependency problems prevent configuration of qbit-cli"
+        ));
+        assert!(!is_permission_denied(
+            "installer: Package (qbit-cli.pkg) has an invalid signature"
+        ));
+        assert!(!is_permission_denied(
+            "dpkg-deb: error: archive has premature member 'control.tar' EOF"
+        ));
+        assert!(!is_permission_denied("No space left on device"));
     }
 }

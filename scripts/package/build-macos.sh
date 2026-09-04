@@ -6,6 +6,7 @@
 #
 # Example:
 #   ./build-macos.sh 1.0.0 arm64 target/release/qbit dist
+#   ./build-macos.sh 1.0.0 x86_64 target/release/qbit dist
 #
 # Optional signing/notarization (used automatically if all required
 # env vars are set; otherwise an unsigned artifact is produced and
@@ -21,7 +22,9 @@ ARCH="${2:?arch required, e.g. arm64 or x86_64}"
 BINARY_PATH="${3:?path to built qbit binary required}"
 OUT_DIR="${4:-dist}"
 
-# --- Requirement 4.5: architecture allowlist ---
+# Arch tokens must match exactly what src/os/update/platform.rs
+# expects to find in the asset filename (Arch::asset_token()):
+# macOS uses "arm64" or "x86_64" verbatim.
 case "$ARCH" in
   arm64|x86_64) ;;
   *)
@@ -38,6 +41,11 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MACOS_PKG_DIR="$REPO_ROOT/packaging/macos"
+
+# Single, consistent identifier used everywhere in this script and in
+# distribution.xml — no ".pkg" suffix variant. This exact string must
+# match distribution.xml's pkg-ref/choice ids and whatever CI uses for
+# `pkgutil --forget` during uninstall testing.
 IDENTIFIER="com.qbit-click.qbit-cli"
 
 STAGE_DIR="$(mktemp -d)"
@@ -46,11 +54,9 @@ trap 'rm -rf "$STAGE_DIR"' EXIT
 PAYLOAD_DIR="$STAGE_DIR/payload"
 mkdir -p "$PAYLOAD_DIR/usr/local/bin"
 
-# --- Requirement 4.3: binary only ever installed at /usr/local/bin/qbit ---
 cp "$BINARY_PATH" "$PAYLOAD_DIR/usr/local/bin/qbit"
 chmod 755 "$PAYLOAD_DIR/usr/local/bin/qbit"
 
-# Optional: sign the binary before packaging, if a signing identity is configured
 SIGNED="false"
 if [ -n "${MACOS_SIGNING_IDENTITY:-}" ]; then
   echo "Signing binary with identity: $MACOS_SIGNING_IDENTITY"
@@ -60,10 +66,8 @@ else
   echo "NOTICE: MACOS_SIGNING_IDENTITY not set — building an UNSIGNED binary."
 fi
 
-# Render distribution.xml with the real version
 sed "s/__VERSION__/$VERSION/" "$MACOS_PKG_DIR/distribution.xml" > "$STAGE_DIR/distribution.xml"
 
-# --- Requirement 4.1: after render, no __VERSION__ placeholder may remain ---
 if grep -q "__VERSION__" "$STAGE_DIR/distribution.xml"; then
   echo "error: __VERSION__ placeholder was not substituted in distribution.xml" >&2
   exit 1
@@ -71,7 +75,6 @@ fi
 
 mkdir -p "$OUT_DIR"
 
-# --- Requirement 4.2: component package version must match distribution version ---
 pkgbuild \
   --root "$PAYLOAD_DIR" \
   --identifier "$IDENTIFIER" \
@@ -79,7 +82,6 @@ pkgbuild \
   --install-location "/" \
   "$STAGE_DIR/component.pkg"
 
-# --- Requirement 4.4: deterministic output filename ---
 PKG_NAME="qbit-cli-${VERSION}-macos-${ARCH}.pkg"
 OUT_FILE="$OUT_DIR/$PKG_NAME"
 
@@ -101,9 +103,6 @@ productbuild "${PRODUCTBUILD_ARGS[@]}" "$OUT_FILE"
 
 echo "Built: $OUT_FILE"
 
-# --- Requirement 4.8/4.9: notarize + staple only if fully signed and a
-# notary profile is configured. Otherwise, clearly log unsigned status
-# rather than silently skipping or mislabeling the artifact. ---
 if [ "$SIGNED" = "true" ] && [ "$INSTALLER_SIGNED" = "true" ] && [ -n "${MACOS_NOTARY_PROFILE:-}" ]; then
   echo "Submitting for notarization using profile: $MACOS_NOTARY_PROFILE"
   xcrun notarytool submit "$OUT_FILE" --keychain-profile "$MACOS_NOTARY_PROFILE" --wait
@@ -113,13 +112,8 @@ else
   echo "RELEASE_ARTIFACT_STATUS: unsigned (this build was not signed and/or not notarized)"
 fi
 
-# --- Requirement 4.6: real validation, no silent '|| true' ---
-# 1. pkgutil must be able to open/expand the package.
-# 2. The payload must contain usr/local/bin/qbit.
-# 3. Missing expected payload must fail the build.
 EXPAND_DIR="$STAGE_DIR/expanded"
 if ! pkgutil --expand-full "$OUT_FILE" "$EXPAND_DIR" 2>/dev/null; then
-  # --expand-full is newer; fall back to --expand + manual payload check
   pkgutil --expand "$OUT_FILE" "$EXPAND_DIR"
 fi
 
@@ -132,3 +126,4 @@ if ! echo "$PAYLOAD_FILES" | grep -qE '(^|/)usr/local/bin/qbit$'; then
 fi
 
 echo "Validated payload contains: usr/local/bin/qbit"
+echo "Package identifier: $IDENTIFIER"

@@ -1,71 +1,47 @@
+<#
+  LEGACY / BOOTSTRAP UNINSTALLER — NOT PART OF THE OFFICIAL RELEASE PATH.
+  See install.ps1 header. Real end users uninstall via Windows
+  "Installed Apps", which invokes the MSI's own uninstall.
+#>
+
 param(
-    [ValidateSet("User", "Machine")]
-    [string]$Scope = "User",
-    [string]$Destination
+    [string]$Destination = (Join-Path $env:LOCALAPPDATA "Programs\Qbit CLI")
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-function Get-DefaultDestination([string]$installScope) {
-    if ($installScope -eq "Machine") {
-        return (Join-Path $env:ProgramFiles "Qbit")
-    }
-
-    $localAppData = [Environment]::GetFolderPath("LocalApplicationData")
-    if (-not $localAppData) {
-        throw "Could not resolve LocalApplicationData for user uninstall."
-    }
-    return (Join-Path $localAppData "Qbit")
-}
-
-function Ensure-AdministratorIfMachineScope([string]$installScope) {
-    if ($installScope -ne "Machine") {
-        return
-    }
-
-    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
-    $isAdmin = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-    if (-not $isAdmin) {
-        throw "Machine scope requires an elevated PowerShell. Re-run as Administrator or use -Scope User."
-    }
-}
-
 function Remove-FromPath([string]$entry, [System.EnvironmentVariableTarget]$target) {
     $current = [Environment]::GetEnvironmentVariable("Path", $target)
-    if (-not $current) {
-        return
-    }
+    if (-not $current) { return }
 
     $normalizedEntry = $entry.TrimEnd("\")
     $segments = @($current -split ";" | Where-Object { $_ -and $_.Trim() -ne "" })
     $filtered = @($segments | Where-Object { $_.TrimEnd("\") -ine $normalizedEntry })
 
     if ($filtered.Count -eq $segments.Count) {
-        Write-Host "PATH entry not found: $entry"
+        Write-Host "PATH entry not found (already removed): $entry"
         return
     }
 
     [Environment]::SetEnvironmentVariable("Path", ($filtered -join ";"), $target)
-    Write-Host "Removed PATH entry for $target: $entry"
+    Write-Host "Removed PATH entry: $entry"
 }
-
-if (-not $Destination) {
-    $Destination = Get-DefaultDestination -installScope $Scope
-}
-
-Ensure-AdministratorIfMachineScope -installScope $Scope
 
 $binDir = Join-Path $Destination "bin"
+
+# Exactly ONE assignment to $binaryPath. A previous version of this
+# script assigned this twice in a row (once to qbit.exe, then
+# immediately overwritten with qbit-cli.exe), which silently left
+# qbit.exe on disk after "successful" uninstall. Do not reintroduce
+# a second assignment to this variable.
 $binaryPath = Join-Path $binDir "qbit.exe"
-$binaryPath = Join-Path $binDir "qbit-cli.exe"
 
 if (Test-Path -LiteralPath $binaryPath) {
     Remove-Item -LiteralPath $binaryPath -Force
     Write-Host "Removed: $binaryPath"
 } else {
-    Write-Host "Binary not found (already removed): $binaryPath"
+    Write-Host "Already removed (idempotent): $binaryPath"
 }
 
 if (Test-Path -LiteralPath $binDir) {
@@ -82,10 +58,6 @@ if (Test-Path -LiteralPath $Destination) {
     }
 }
 
-$target = if ($Scope -eq "Machine") { [System.EnvironmentVariableTarget]::Machine } else { [System.EnvironmentVariableTarget]::User }
-Remove-FromPath -entry $binDir -target $target
-
-$processSegments = @($env:Path -split ";" | Where-Object { $_ -and $_.Trim() -ne "" })
-$env:Path = (@($processSegments | Where-Object { $_.TrimEnd("\") -ine $binDir.TrimEnd("\") }) -join ";")
+Remove-FromPath -entry $binDir -target ([System.EnvironmentVariableTarget]::User)
 
 Write-Host "qbit uninstall complete."

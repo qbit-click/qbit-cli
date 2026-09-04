@@ -100,13 +100,26 @@ jobs:
             --passphrase "$GPG_PASSPHRASE" \
             --output target/release/${{ matrix.binary_name }}.sig \
             --detach-sign target/release/${{ matrix.binary_name }}
-      - name: Extract version from tag
+      - name: Verify tag matches Cargo.toml version
         id: version
         shell: bash
         run: |
-          # GITHUB_REF_NAME is e.g. "v1.2.3" -> strip the leading v
-          version="${GITHUB_REF_NAME#v}"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # Cargo.toml is the single source of truth for the version.
+          # The pushed tag must match it exactly (after stripping the
+          # leading 'v'), or the release is aborted. This prevents a
+          # tag/Cargo.toml mismatch from silently shipping installers
+          # whose filename claims one version while the binary itself
+          # (via CARGO_PKG_VERSION) reports another.
+          cargo_version=$(grep -m1 '^version = ' Cargo.toml | sed -E 's/version = "(.*)"/\1/')
+          tag_version="${GITHUB_REF_NAME#v}"
+
+          if [ "$cargo_version" != "$tag_version" ]; then
+            echo "error: tag version ($tag_version) does not match Cargo.toml version ($cargo_version)" >&2
+            echo "Bump [package] version in Cargo.toml to $tag_version before tagging, or re-tag to match $cargo_version." >&2
+            exit 1
+          fi
+
+          echo "version=$cargo_version" >> "$GITHUB_OUTPUT"
 
       - name: Install WiX (Windows)
         if: matrix.os == 'windows-latest'

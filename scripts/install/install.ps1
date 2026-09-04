@@ -1,36 +1,20 @@
+<#
+  LEGACY / BOOTSTRAP INSTALLER — NOT PART OF THE OFFICIAL RELEASE PATH.
+
+  This script is not published as part of any GitHub Release and is
+  never invoked by `qbit upgrade`. The supported end-user
+  install/upgrade/uninstall path is the MSI (see
+  packaging/windows/QbitCli.wxs). This script exists only as an
+  optional convenience for local development: building qbit.exe
+  yourself and wanting it on PATH without building the full MSI.
+#>
+
 param(
-    [ValidateSet("User", "Machine")]
-    [string]$Scope = "User",
-    [string]$Destination
+    [string]$Destination = (Join-Path $env:LOCALAPPDATA "Programs\Qbit CLI")
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
-
-function Get-DefaultDestination([string]$installScope) {
-    if ($installScope -eq "Machine") {
-        return (Join-Path $env:ProgramFiles "Qbit")
-    }
-
-    $localAppData = [Environment]::GetFolderPath("LocalApplicationData")
-    if (-not $localAppData) {
-        throw "Could not resolve LocalApplicationData for user install."
-    }
-    return (Join-Path $localAppData "Qbit")
-}
-
-function Ensure-AdministratorIfMachineScope([string]$installScope) {
-    if ($installScope -ne "Machine") {
-        return
-    }
-
-    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
-    $isAdmin = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-    if (-not $isAdmin) {
-        throw "Machine scope requires an elevated PowerShell. Re-run as Administrator or use -Scope User."
-    }
-}
 
 function Add-ToPath([string]$entry, [System.EnvironmentVariableTarget]$target) {
     $current = [Environment]::GetEnvironmentVariable("Path", $target)
@@ -46,37 +30,25 @@ function Add-ToPath([string]$entry, [System.EnvironmentVariableTarget]$target) {
         return
     }
 
-    $newValue = if ($current -and $current.Trim() -ne "") {
-        "$current;$entry"
-    } else {
-        $entry
-    }
+    $newValue = if ($current -and $current.Trim() -ne "") { "$current;$entry" } else { $entry }
     [Environment]::SetEnvironmentVariable("Path", $newValue, $target)
     Write-Host "PATH updated for $target. Reopen your terminal to use 'qbit'."
 }
 
-if (-not $Destination) {
-    $Destination = Get-DefaultDestination -installScope $Scope
-}
-
-Ensure-AdministratorIfMachineScope -installScope $Scope
-
 $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
-$binaryPath = Join-Path $scriptRoot "qbit-cli.exe"
+
+# Only qbit.exe is ever expected or installed by this script.
+# qbit-cli.exe is not a recognized input and is never created.
+$binaryPath = Join-Path $scriptRoot "qbit.exe"
 if (-not (Test-Path -LiteralPath $binaryPath)) {
-    throw "qbit-cli.exe was not found next to install.ps1. Extract the release archive and run the script from that folder."
+    throw "qbit.exe was not found next to install.ps1. Build it first with 'cargo build --release' and copy target\release\qbit.exe next to this script."
 }
 
+# Matches the MSI-installed layout: %LOCALAPPDATA%\Programs\Qbit CLI\bin\qbit.exe
 $binDir = Join-Path $Destination "bin"
 New-Item -ItemType Directory -Force -Path $binDir | Out-Null
-Copy-Item -LiteralPath $binaryPath -Destination (Join-Path $binDir "qbit-cli.exe") -Force
 Copy-Item -LiteralPath $binaryPath -Destination (Join-Path $binDir "qbit.exe") -Force
 
-$target = if ($Scope -eq "Machine") { [System.EnvironmentVariableTarget]::Machine } else { [System.EnvironmentVariableTarget]::User }
-Add-ToPath -entry $binDir -target $target
-
-if (-not (($env:Path -split ";" | Where-Object { $_.TrimEnd("\") -ieq $binDir.TrimEnd("\") }))) {
-    $env:Path = if ($env:Path) { "$env:Path;$binDir" } else { $binDir }
-}
+Add-ToPath -entry $binDir -target ([System.EnvironmentVariableTarget]::User)
 
 Write-Host "Installed qbit to $binDir\qbit.exe"

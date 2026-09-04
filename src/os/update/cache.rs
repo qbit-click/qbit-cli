@@ -1,10 +1,15 @@
 //! Persistent cache for the 24-hour update check.
 //!
+//! This is the ONLY cache implementation used by the runtime. A
+//! duplicate implementation at `src/os/cache.rs` existed briefly and
+//! has been removed — if you see that file again, delete it; nothing
+//! should import from it.
+//!
 //! Stores: the timestamp of the last successful check, the latest
 //! version seen at that check, and the GitHub API ETag (for
 //! conditional requests / rate-limit friendliness).
 //!
-//! Design constraints (per checklist):
+//! Design constraints:
 //! - A corrupt or unreadable cache file must never fail the CLI. Any
 //!   read/parse error is treated the same as "no cache yet".
 //! - Writes are atomic: write to a temp file in the same directory,
@@ -22,19 +27,12 @@ const CACHE_FILE_NAME: &str = "update-check.json";
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct UpdateCache {
-    /// Unix timestamp (seconds) of the last successful check.
     pub last_checked_unix: u64,
-    /// Latest version string observed at that check (e.g. "1.2.3").
     pub latest_seen_version: Option<String>,
-    /// GitHub API ETag from the last successful response, for
-    /// conditional requests (If-None-Match) to save rate limit.
     pub etag: Option<String>,
 }
 
 impl UpdateCache {
-    /// Loads the cache from disk. Any failure (missing file, invalid
-    /// JSON, permission error) is treated as "no cache" rather than
-    /// propagated — the CLI must never fail because of this.
     pub fn load(path: &Path) -> UpdateCache {
         match fs::read_to_string(path) {
             Ok(contents) => serde_json::from_str(&contents).unwrap_or_default(),
@@ -42,9 +40,6 @@ impl UpdateCache {
         }
     }
 
-    /// Writes the cache to disk atomically (write-temp + rename).
-    /// Returns Err on failure so callers can choose to ignore it, but
-    /// never panics.
     pub fn save(&self, path: &Path) -> std::io::Result<()> {
         let parent = path.parent().unwrap_or_else(|| Path::new("."));
         fs::create_dir_all(parent)?;
@@ -58,14 +53,10 @@ impl UpdateCache {
             tmp_file.sync_all()?;
         }
 
-        // Rename is atomic on the same filesystem on all platforms we
-        // support (POSIX rename(2), Windows MoveFileEx via std).
         fs::rename(&tmp_path, path)?;
         Ok(())
     }
 
-    /// True if at least 24 hours have passed since the last check (or
-    /// there has never been a successful check).
     pub fn is_due(&self, now_unix: u64) -> bool {
         const TWENTY_FOUR_HOURS_SECS: u64 = 24 * 60 * 60;
         if self.last_checked_unix == 0 {
@@ -77,18 +68,23 @@ impl UpdateCache {
 
 /// Default cache file location: alongside other qbit config, under
 /// the OS-appropriate config/cache directory. Falls back to a temp
-/// directory if the home directory can't be resolved (e.g. some CI
-/// sandboxes), since a missing cache location must never be fatal.
+/// directory if the home directory can't be resolved, since a
+/// missing cache location must never be fatal.
+///
+/// Honors `QBIT_UPDATE_CACHE_DIR` as an override — this is the ONLY
+/// place this override is implemented. Integration tests
+/// (`tests/update_check.rs`) rely on this to redirect the cache to an
+/// isolated temp directory instead of the real user cache location.
 pub fn default_cache_path() -> PathBuf {
+    if let Some(dir) = std::env::var_os("QBIT_UPDATE_CACHE_DIR") {
+        return PathBuf::from(dir).join(CACHE_FILE_NAME);
+    }
     if let Some(dir) = dirs_next_cache_dir() {
         return dir.join("qbit").join(CACHE_FILE_NAME);
     }
     std::env::temp_dir().join("qbit").join(CACHE_FILE_NAME)
 }
 
-/// Minimal, dependency-free cache-dir resolution so we don't need to
-/// pull in the `dirs` crate just for this. Mirrors XDG on Linux,
-/// standard locations on macOS/Windows.
 fn dirs_next_cache_dir() -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     {
@@ -169,7 +165,7 @@ mod tests {
     fn is_due_false_within_24_hours() {
         let now = 1_000_000;
         let cache = UpdateCache {
-            last_checked_unix: now - 60, // 1 minute ago
+            last_checked_unix: now - 60,
             ..Default::default()
         };
         assert!(!cache.is_due(now));
@@ -179,7 +175,7 @@ mod tests {
     fn is_due_true_after_24_hours() {
         let now = 1_000_000;
         let cache = UpdateCache {
-            last_checked_unix: now - (25 * 60 * 60), // 25 hours ago
+            last_checked_unix: now - (25 * 60 * 60),
             ..Default::default()
         };
         assert!(cache.is_due(now));
@@ -189,7 +185,7 @@ mod tests {
     fn is_due_boundary_exactly_24_hours() {
         let now = 1_000_000;
         let cache = UpdateCache {
-            last_checked_unix: now - (24 * 60 * 60), // exactly 24h ago
+            last_checked_unix: now - (24 * 60 * 60),
             ..Default::default()
         };
         assert!(cache.is_due(now));
@@ -197,10 +193,6 @@ mod tests {
 
     #[test]
     fn concurrent_saves_do_not_corrupt_cache() {
-        // Simulates two "processes" (here: two saves using different
-        // temp file names, since we key the temp filename by pid) both
-        // writing to the same cache path. The final file must always
-        // be valid JSON — one write fully wins, never an interleaved mix.
         let dir = tempdir().unwrap();
         let path = dir.path().join("cache.json");
 
@@ -218,10 +210,31 @@ mod tests {
         cache_a.save(&path).unwrap();
         cache_b.save(&path).unwrap();
 
-        // Whichever wrote last should be intact and parseable — not a
-        // half-written mix of both.
         let loaded = UpdateCache::load(&path);
         assert_eq!(loaded.last_checked_unix, 222);
         assert_eq!(loaded.latest_seen_version.as_deref(), Some("2.0.0"));
+    }
+
+    #[test]
+    fn qbit_update_cache_dir_override_actually_redirects_resolved_path() {
+        // Proves the override is real: default_cache_path() must
+        // return a path INSIDE the temp dir we set, not the real
+        // user cache location, when QBIT_UPDATE_CACHE_DIR is set.
+        let dir = tempdir().unwrap();
+        let dir_path = dir.path().to_path_buf();
+
+        unsafe {
+            std::env::set_var("QBIT_UPDATE_CACHE_DIR", &dir_path);
+        }
+        let resolved = default_cache_path();
+        unsafe {
+            std::env::remove_var("QBIT_UPDATE_CACHE_DIR");
+        }
+
+        assert!(
+            resolved.starts_with(&dir_path),
+            "resolved cache path {resolved:?} must be inside override dir {dir_path:?}"
+        );
+        assert_eq!(resolved, dir_path.join(CACHE_FILE_NAME));
     }
 }

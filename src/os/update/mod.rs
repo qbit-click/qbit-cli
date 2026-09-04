@@ -17,7 +17,12 @@ use cache::UpdateCache;
 use github::{CheckOutcome, GithubClient, RealGithubClient};
 
 const DEFAULT_REPOSITORY: &str = "qbit-click/qbit-cli";
-const DISABLE_ENV_VAR: &str = "CHECK_UPDATE_DISABLE_QBIT";
+
+/// Disables the automatic periodic update check only. This must
+/// never affect a manually-invoked `qbit upgrade`, which always runs
+/// regardless of this flag.
+const DISABLE_ENV_VAR: &str = "QBIT_DISABLE_UPDATE_CHECK";
+
 const DEBUG_ENV_VAR: &str = "QBIT_UPDATE_DEBUG";
 
 /// Result of a check attempt, for the caller to decide what (if
@@ -36,17 +41,14 @@ pub enum CheckResult {
     /// The check itself failed (network error, parse error, rate
     /// limit, etc). The message is never shown by default (the check
     /// must stay silent on failure), but is surfaced to stderr when
-    /// `QBIT_UPDATE_DEBUG=1` is set, so failures are diagnosable
-    /// without ever being visible to a normal user by default.
+    /// `QBIT_UPDATE_DEBUG=1` is set.
     CheckFailed(String),
 }
 
 impl CheckResult {
     /// Logs a `CheckFailed` message to stderr, but only when
     /// `QBIT_UPDATE_DEBUG=1` is set. For every other variant, and
-    /// when debug logging isn't enabled, this does nothing — callers
-    /// can call this unconditionally without needing to match on the
-    /// variant themselves.
+    /// when debug logging isn't enabled, this does nothing.
     pub fn log_failure_if_debug_enabled(&self) {
         if let CheckResult::CheckFailed(message) = self {
             if std::env::var(DEBUG_ENV_VAR).as_deref() == Ok("1") {
@@ -57,15 +59,7 @@ impl CheckResult {
 }
 
 /// The single entry point `main.rs` should call before normal command
-/// dispatch. This function:
-/// - returns immediately if disabled via env var
-/// - returns immediately if not yet due (checked cache says so)
-/// - otherwise performs a short-timeout GitHub check and updates the
-///   cache
-///
-/// This function does not print anything itself — callers decide
-/// whether/how to surface the result (per the requirement that any
-/// message goes to stderr only, never stdout).
+/// dispatch.
 pub fn check_if_due() -> CheckResult {
     if is_disabled() {
         return CheckResult::Disabled;
@@ -88,8 +82,7 @@ pub fn check_if_due() -> CheckResult {
 }
 
 /// Core logic factored out from [`check_if_due`] so it can be
-/// exercised in tests with a fake `GithubClient`, without touching the
-/// real cache file location or the network.
+/// exercised in tests with a fake `GithubClient`.
 pub fn check_with_client(
     client: &dyn GithubClient,
     existing: &UpdateCache,
@@ -156,9 +149,7 @@ fn current_version_str() -> &'static str {
 }
 
 /// Compares a possibly-"v"-prefixed tag against the current build
-/// version. Any parse failure is treated as "not newer" (fail safe:
-/// we'd rather silently skip a malformed comparison than falsely
-/// claim an update is available).
+/// version. Any parse failure is treated as "not newer".
 fn is_newer(candidate_tag: &str, current: &str) -> bool {
     let normalize = |s: &str| s.trim().strip_prefix('v').unwrap_or(s.trim()).to_string();
 
@@ -268,9 +259,6 @@ mod tests {
 
     #[test]
     fn check_failed_message_is_actually_read_by_log_helper() {
-        // Confirms the String field on CheckFailed is genuinely used
-        // (not dead code): the debug-log helper reads it when the
-        // debug env var is set.
         unsafe {
             std::env::set_var(DEBUG_ENV_VAR, "1");
         }
@@ -279,9 +267,12 @@ mod tests {
         unsafe {
             std::env::remove_var(DEBUG_ENV_VAR);
         }
-        // No panic and no assertion on stderr content here (capturing
-        // stderr reliably across test runners is out of scope) — this
-        // test's purpose is to prove the field is read, which the
-        // compiler itself now verifies (no more dead-code warning).
+    }
+
+    #[test]
+    fn env_var_name_is_qbit_disable_update_check() {
+        // Locks in the exact, final env var name so a future refactor
+        // can't silently rename it again without this test catching it.
+        assert_eq!(DISABLE_ENV_VAR, "QBIT_DISABLE_UPDATE_CHECK");
     }
 }

@@ -11,7 +11,8 @@
 //! GitHub API. Every scenario here either disables the check
 //! entirely, pre-seeds the cache so no network call is attempted, or
 //! deliberately points at a nonexistent repository to simulate a
-//! network/API failure without depending on real network access.
+//! network/API failure without depending on live GitHub API
+//! availability.
 //!
 //! `QBIT_UPDATE_CACHE_DIR` (test-only override) lets each test point
 //! the update cache at an isolated temp directory instead of the real
@@ -23,6 +24,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use assert_cmd::Command;
 use tempfile::tempdir;
+
+/// Final, documented name for disabling the automatic periodic update
+/// check. This must never disable manual `qbit upgrade`.
+const DISABLE_ENV_VAR: &str = "QBIT_DISABLE_UPDATE_CHECK";
 
 fn now_unix() -> u64 {
     SystemTime::now()
@@ -52,7 +57,7 @@ fn read_cache_json(cache_dir: &std::path::Path) -> Option<String> {
     fs::read_to_string(cache_dir.join("update-check.json")).ok()
 }
 
-/// `CHECK_UPDATE_DISABLE_QBIT=1` disables the check entirely. No
+/// `QBIT_DISABLE_UPDATE_CHECK=1` disables the check entirely. No
 /// cache file should be written, and the main command must succeed.
 #[test]
 fn disable_env_var_skips_check_entirely() {
@@ -60,7 +65,7 @@ fn disable_env_var_skips_check_entirely() {
 
     let assert = Command::cargo_bin("qbit")
         .expect("qbit binary")
-        .env("CHECK_UPDATE_DISABLE_QBIT", "1")
+        .env(DISABLE_ENV_VAR, "1")
         .env("QBIT_UPDATE_CACHE_DIR", cache_dir.path())
         .arg("--help")
         .assert();
@@ -73,7 +78,7 @@ fn disable_env_var_skips_check_entirely() {
 }
 
 /// Manual `qbit upgrade` must NOT be affected by
-/// `CHECK_UPDATE_DISABLE_QBIT=1` — that flag only disables the
+/// `QBIT_DISABLE_UPDATE_CHECK=1` — that flag only disables the
 /// automatic periodic check, never the explicit user-invoked command.
 /// We point at a nonexistent repo so the command fails fast (no real
 /// network dependency needed), and assert the failure comes from
@@ -82,7 +87,7 @@ fn disable_env_var_skips_check_entirely() {
 fn disable_env_var_does_not_disable_manual_upgrade_command() {
     let assert = Command::cargo_bin("qbit")
         .expect("qbit binary")
-        .env("CHECK_UPDATE_DISABLE_QBIT", "1")
+        .env(DISABLE_ENV_VAR, "1")
         .env(
             "QBIT_UPGRADE_REPO",
             "qbit-click/this-repo-does-not-exist-12345",
@@ -98,7 +103,7 @@ fn disable_env_var_does_not_disable_manual_upgrade_command() {
     );
     assert!(
         !combined.to_lowercase().contains("disabled"),
-        "manual `qbit upgrade` must not be short-circuited by CHECK_UPDATE_DISABLE_QBIT; got: {combined}"
+        "manual `qbit upgrade` must not be short-circuited by {DISABLE_ENV_VAR}; got: {combined}"
     );
 }
 
